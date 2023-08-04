@@ -4,6 +4,7 @@ FROM ros:noetic-ros-base-focal
 RUN apt-get update && apt-get install --no-install-recommends -y \
     nano \
     wget\
+    libpthread-stubs0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # install bootstrap tools
@@ -19,7 +20,7 @@ RUN sh \
         > /etc/apt/sources.list.d/ros-latest.list'
 RUN wget http://packages.ros.org/ros.key -O - | apt-key add -
 
-# install other packages
+# install ROS packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-catkin-tools\
     ros-$ROS_DISTRO-perception\

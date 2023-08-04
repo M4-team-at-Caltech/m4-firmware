@@ -22,6 +22,4 @@ else
 	     --device-cgroup-rule "c 81:* rmw" \
 	     --device-cgroup-rule "c 189:* rmw" \
              ${IMAGE_NAME} /bin/bash
-
-  echo "Container ${CONTAINER_NAME} started."
 fi
