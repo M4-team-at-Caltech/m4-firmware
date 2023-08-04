@@ -67,16 +67,17 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	configFilePath = std::string(PROJECT_ROOT_DIR) + "/config/robot_config.yaml";
 	config = YAML::LoadFile(configFilePath);
 
-	std::vector<std::string> joint_names = config["JOINT_NAMES"].as<std::vector<std::string>>();
+	std::vector<std::string> joint_names = config["joint_names"].as<std::vector<std::string>>();
 
 	for (int i = 0; i < joint_names.size(); i++)
 	{
 		int jid = config["joints"][joint_names[i]]["id"].as<int>();
 		// Check if the joint ID is in the list of active joints
-		auto j_index = std::find(active_joint_ids.begin(), active_joint_ids.end(), [jid](int id) { return id == jid; });
+		auto j_index = std::find(active_joint_ids.begin(), active_joint_ids.end(), jid);
         if(j_index != active_joint_ids.end())
 		{
 			JointConfig jconfig;
+			jconfig.name = joint_names[i];
 			jconfig.id = jid;
             jconfig.zero_tick = config["joints"][joint_names[i]]["zero_tick"].as<int>();
 			jconfig.max_tick = config["joints"][joint_names[i]]["max_tick"].as<int>();
@@ -105,6 +106,17 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	printf("\tPROTOCOL_VERSION: %f\n", PROTOCOL_VERSION);
 	printf("\tTORQUE_ENABLE: %d\n", TORQUE_ENABLE);
 	printf("\tTORQUE_DISABLE: %d\n", TORQUE_DISABLE);
+	printf("\n%sJoint configurations:\n%s", CONSOLE_GREEN, CONSOLE_DEFAULT);
+	for(int i=0; i < joint_configs.size(); i++)
+	{
+		printf("\t%s:\n",joint_configs[i].name.c_str());
+		printf("\t\tID: %d\n\t\tzero_tick: %d\n\t\tmin_tick: %d\n\t\tmax_tick: %d\n\t\tspeed: %f\n\n",
+			joint_configs[i].id,
+			joint_configs[i].zero_tick,
+			joint_configs[i].min_tick,
+			joint_configs[i].max_tick,
+			joint_configs[i].speed);
+	}
 	
 	//---------------------------------------------------------------------------------------------------------------
 
@@ -263,12 +275,23 @@ int DynamixelPositionInterface::write_position(std::vector<int> ids, std::vector
 	// Convert positions from degrees to ticks and add zero offset
 	for(int i = 0; i < positions.size(); i++)
 	{
-		positions[i] = positions[i] / MULT_POSITION + joint_configs[ids[i]].zero_tick;
+		JointConfig jconfig = joint_configs[std::find(active_joint_ids.begin(), active_joint_ids.end(), ids[i]) - active_joint_ids.begin()];
+		positions[i] = positions[i] / MULT_POSITION + jconfig.zero_tick;
 		// Warn if positions are out of range
-		if(positions[i] < joint_configs[ids[i]].min_tick || positions[i] > joint_configs[ids[i]].max_tick)
+		if(positions[i] < jconfig.min_tick)
 		{
-			printf("%s[WARN]: [set_goal_position] Position %d out of range for Dynamixel %d%s\n", CONSOLE_MSG_WARN, positions[i], ids[i], CONSOLE_DEFAULT);
+			printf("%s[ERROR]: [set_goal_position] Position %d out of range for Joint %s%s\n", CONSOLE_MSG_ERROR, int(positions[i]), jconfig.name.c_str(), CONSOLE_DEFAULT);
+			printf("[WARN]: Moving to min position %d instead", jconfig.min_tick);
+			positions[i] = jconfig.min_tick;
 		}
+		else if(positions[i] > jconfig.max_tick)
+		{
+			printf("%s[ERROR]: [set_goal_position] Position %d out of range for Joint %s%s\n", CONSOLE_MSG_ERROR, int(positions[i]), jconfig.name.c_str(), CONSOLE_DEFAULT);
+			printf("[WARN]: Moving to max position %d instead\n", jconfig.max_tick);
+			positions[i] = jconfig.max_tick;
+		}
+		
+		//printf("[INFO]: Writing position %d=%f deg to joint %s\n", int(positions[i]), (positions[i] - jconfig.zero_tick)*MULT_POSITION, jconfig.name.c_str());
 	}
 
 	int dxl_error = 0;

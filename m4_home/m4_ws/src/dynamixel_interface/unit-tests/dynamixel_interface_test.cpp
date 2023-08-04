@@ -26,28 +26,27 @@ using namespace std;
 
 atomic<bool> stopFlag(false);
 
-void send_command_looped(DynamixelPositionInterface *dxl,vector<int> id_list,vector<float> goal_positions)
+void send_command_looped(DynamixelPositionInterface *dxl,vector<int> id_list,vector<float> goal_positions1, vector<float> goal_positions2)
 {
-	bool latch_engage=false;
+	vector<float> goal_positions = goal_positions1;
 
 	while (!stopFlag)
 	{
 		// Send a simple movement command to the Dynamixels
 		dxl->write_position(id_list, goal_positions);
 
-		for(int i=0; i<goal_positions.size(); i++)
-		{
-			goal_positions[i] *= -1;
-		}
-		
-		latch_engage = !latch_engage;
+		if(goal_positions == goal_positions1)
+			goal_positions = goal_positions2;
+		else
+			goal_positions = goal_positions;
+			//goal_positions = goal_positions1;
 
 		// 100ms - 	10 Hz
 		// 50ms - 	20 Hz
 		// 20ms - 	50 Hz
 		// 10ms - 	100 Hz
 		// 5ms - 	200 Hz
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     }
 }
 
@@ -57,20 +56,18 @@ int main(int argc, char *argv[])
 	// Verify that the port name is correct. This can be different on your system
 	// Baudrate is set using the Dynamixel Wizard on the Dynamixel Servo directly
 	const char* port = string("/dev/ttyUSB0").c_str();
-	int baudrate = 4000000;
+	int baudrate = 115200;
 	
 	// List of dynamixel IDs to actuate for this test
-	vector<int> id_list = {1, 2};	
-	vector<float> goal_positions = {10, -10}; // Oscilate between +/- 20 degrees
+	vector<int> id_list = {2, 4};	
+	vector<float> goal_positions1 = {0, 0}; 
+	vector<float> goal_positions2 = {90, 90}; 
 	
     // Create a DynamixelInterface object
 	DynamixelPositionInterface dxl(port, baudrate, id_list);
 
-	// Set movement speed in degrees per second
-	dxl.write_movement_speed(60.0);
-
     // Set the goal positions
-	thread cmd_thread(send_command_looped, &dxl, id_list, goal_positions);
+	thread cmd_thread(send_command_looped, &dxl, id_list, goal_positions1, goal_positions2);
 
 	cout << "Press q to quit" << endl;
 

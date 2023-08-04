@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.0.2)
 project(dynamixel_interface)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11)
-add_compile_options(-pthread)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 add_subdirectory(third-party/yaml-cpp)
 
@@ -12,8 +12,6 @@ add_subdirectory(third-party/yaml-cpp)
 ## is used, also find other catkin packages
 find_package(
 	catkin REQUIRED
-	Threads REQUIRED
-	yaml-cpp REQUIRED
 	)
 
 ## System dependencies are found with CMake's conventions
@@ -187,12 +185,28 @@ add_library(dynamixel_sdk STATIC
 set(UNIT_TEST_SCRIPTS
 	# Stored in test-scripts/unit-tests
 	dynamixel_interface_test
-	dynamixel_read_status_test
 )
 
 set(COMMON_LIBRARIES
-	CobraRoot DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+	DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
 )
+
+# Set up the unit tests
+foreach(SCRIPT IN LISTS UNIT_TEST_SCRIPTS)
+	# List of source files
+	set(SOURCES unit-tests/${SCRIPT}.cpp)
+
+	# Add the executables
+	add_executable(${SCRIPT} ${SOURCES})
+
+	# Link common libraries
+	target_link_libraries(${SCRIPT} ${COMMON_LIBRARIES})
+
+	# Set output location
+	set_target_properties(${SCRIPT} 
+		PROPERTIES 
+		OUTPUT_NAME ${SCRIPT} PREFIX "")
+endforeach()
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

@@ -39,6 +39,7 @@ struct DynamixelStatus
 
 struct JointConfig
 {
+	std::string name;
 	int id;
 	int zero_tick;
 	int max_tick;
