@@ -15,18 +15,11 @@
 DynamixelPositionInterface::DynamixelPositionInterface()
 {
 	initialized = false;
-	debug = false;
 }
 
 DynamixelPositionInterface::DynamixelPositionInterface(const char* port, const int &baudrate, const std::vector<int> &ids)
 {
-	debug = false;
 	init(port, baudrate, ids);
-}
-
-void DynamixelPositionInterface::enable_debug_msgs()
-{
-	debug = true;
 }
 
 void DynamixelPositionInterface::init(const char* port, const int &baudrate, const std::vector<int> &ids)
@@ -36,7 +29,8 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	ids: List of motor IDs to connect to (IDs set on Dynamixel using Dynamixel Wizard).
 */
 {
-	active_ids = ids;
+	active_joint_ids = ids;
+	joint_configs.resize(active_joint_ids.size());
 	
 	// Load configuration variables
 	//---------------------------------------------------------------------------------------------------------------
@@ -44,32 +38,54 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 
 	printf("[INFO] Loading Dynamixel Params...\n");
 
-	std::string configFilePath = std::string(PROJECT_ROOT_DIR) + "/config/config.yaml";
+	std::string configFilePath = std::string(PROJECT_ROOT_DIR) + "/config/motor_config.yaml";
 	YAML::Node config = YAML::LoadFile(configFilePath);
 	
-	ADDR_GOAL_POSITION = config["dynamixel"]["ADDR_GOAL_POSITION"].as<int>();
-	ADDR_TORQUE_ENABLE = config["dynamixel"]["ADDR_TORQUE_ENABLE"].as<int>();
-	ADDR_MOVEMENT_SPEED = config["dynamixel"]["ADDR_MOVEMENT_SPEED"].as<int>();
-	ADDR_PRESENT_POSITION = config["dynamixel"]["ADDR_PRESENT_POSITION"].as<int>();
-	ADDR_PRESENT_VELOCITY = config["dynamixel"]["ADDR_PRESENT_VELOCITY"].as<int>();
-	ADDR_PRESENT_CURRENT = config["dynamixel"]["ADDR_PRESENT_POSITION"].as<int>();
-	LEN_TORQUE_ENABLE = config["dynamixel"]["LEN_TORQUE_ENABLE"].as<int>();
-	LEN_GOAL_POSITION = config["dynamixel"]["LEN_GOAL_POSITION"].as<int>();
-	LEN_MOVEMENT_SPEED = config["dynamixel"]["LEN_MOVEMENT_SPEED"].as<int>();
-	LEN_PRESENT_POSITION = config["dynamixel"]["LEN_PRESENT_POSITION"].as<int>();
-	LEN_PRESENT_VELOCITY = config["dynamixel"]["LEN_PRESENT_VELOCITY"].as<int>();
-	LEN_PRESENT_CURRENT = config["dynamixel"]["LEN_PRESENT_CURRENT"].as<int>();
-	MULT_SPEED = config["dynamixel"]["MULT_SPEED"].as<float>();
-	MULT_POSITION = config["dynamixel"]["MULT_POSITION"].as<float>();
-	MULT_CURRENT = config["dynamixel"]["MULT_CURRENT"].as<float>();
-	PROTOCOL_VERSION = config["dynamixel"]["PROTOCOL_VERSION"].as<float>();
-	TORQUE_ENABLE = config["dynamixel"]["TORQUE_ENABLE"].as<int>();
-	TORQUE_DISABLE = config["dynamixel"]["TORQUE_DISABLE"].as<int>();
-	DXL_MAXIMUM_POSITION_VALUE = config["dynamixel"]["DXL_MAXIMUM_POSITION_VALUE"].as<int>();
-	DXL_MINIMUM_POSITION_VALUE = config["dynamixel"]["DXL_MINIMUM_POSITION_VALUE"].as<int>();
-	
+	ADDR_GOAL_POSITION = config["ADDR_GOAL_POSITION"].as<int>();
+	ADDR_TORQUE_ENABLE = config["ADDR_TORQUE_ENABLE"].as<int>();
+	ADDR_MOVEMENT_SPEED = config["ADDR_MOVEMENT_SPEED"].as<int>();
+	ADDR_PRESENT_POSITION = config["ADDR_PRESENT_POSITION"].as<int>();
+	ADDR_PRESENT_VELOCITY = config["ADDR_PRESENT_VELOCITY"].as<int>();
+	ADDR_PRESENT_CURRENT = config["ADDR_PRESENT_CURRENT"].as<int>();
+	LEN_TORQUE_ENABLE = config["LEN_TORQUE_ENABLE"].as<int>();
+	LEN_GOAL_POSITION = config["LEN_GOAL_POSITION"].as<int>();
+	LEN_MOVEMENT_SPEED = config["LEN_MOVEMENT_SPEED"].as<int>();
+	LEN_PRESENT_POSITION = config["LEN_PRESENT_POSITION"].as<int>();
+	LEN_PRESENT_VELOCITY = config["LEN_PRESENT_VELOCITY"].as<int>();
+	LEN_PRESENT_CURRENT = config["LEN_PRESENT_CURRENT"].as<int>();
+	MULT_SPEED = config["MULT_SPEED"].as<float>();
+	MULT_POSITION = config["MULT_POSITION"].as<float>();
+	MULT_CURRENT = config["MULT_CURRENT"].as<float>();
+	PROTOCOL_VERSION = config["PROTOCOL_VERSION"].as<float>();
+	TORQUE_ENABLE = config["TORQUE_ENABLE"].as<int>();
+	TORQUE_DISABLE = config["TORQUE_DISABLE"].as<int>();
+
 	printf("[INFO] Loaded Dynamixel Params.\n");
 
+	printf("[INFO] Loading Robot Joint Params...\n");
+
+	configFilePath = std::string(PROJECT_ROOT_DIR) + "/config/robot_config.yaml";
+	config = YAML::LoadFile(configFilePath);
+
+	std::vector<std::string> joint_names = config["JOINT_NAMES"].as<std::vector<std::string>>();
+
+	for (int i = 0; i < joint_names.size(); i++)
+	{
+		int jid = config["joints"][joint_names[i]]["id"].as<int>();
+		// Check if the joint ID is in the list of active joints
+		auto j_index = std::find(active_joint_ids.begin(), active_joint_ids.end(), [jid](int id) { return id == jid; });
+        if(j_index != active_joint_ids.end())
+		{
+			JointConfig jconfig;
+			jconfig.id = jid;
+            jconfig.zero_tick = config["joints"][joint_names[i]]["zero_tick"].as<int>();
+			jconfig.max_tick = config["joints"][joint_names[i]]["max_tick"].as<int>();
+			jconfig.min_tick = config["joints"][joint_names[i]]["min_tick"].as<int>();
+			jconfig.speed = config["joints"][joint_names[i]]["speed"].as<float>();
+			joint_configs[j_index - active_joint_ids.begin()] = jconfig;
+		}
+	}
+	
 	printf("%sInitializing dynamixel with settings:\n%s", CONSOLE_GREEN, CONSOLE_DEFAULT);
 	printf("\tADDR_TORQUE_ENABLE: %d\n", ADDR_TORQUE_ENABLE);
 	printf("\tADDR_GOAL_POSITION: %d\n", ADDR_GOAL_POSITION);
@@ -89,8 +105,6 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	printf("\tPROTOCOL_VERSION: %f\n", PROTOCOL_VERSION);
 	printf("\tTORQUE_ENABLE: %d\n", TORQUE_ENABLE);
 	printf("\tTORQUE_DISABLE: %d\n", TORQUE_DISABLE);
-	printf("\tDXL_MAXIMUM_POSITION_VALUE: %d\n", DXL_MAXIMUM_POSITION_VALUE);
-	printf("\tDXL_MINIMUM_POSITION_VALUE: %d\n", DXL_MINIMUM_POSITION_VALUE);
 	
 	//---------------------------------------------------------------------------------------------------------------
 
@@ -114,14 +128,20 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	groupSyncRead = new dynamixel::GroupSyncRead(portHandler, packetHandler, read_start_address, read_data_length);
 
 	// Add other motors read
-	for(int i = 0; i < active_ids.size(); i++)
+	for(int i = 0; i < active_joint_ids.size(); i++)
 	{
-		dxl_addparam_result = groupSyncRead->addParam(active_ids[i]);
+		dxl_addparam_result = groupSyncRead->addParam(active_joint_ids[i]);
 		if (dxl_addparam_result != true)
 		{
-			fprintf(stderr, "[ID:%03d] groupSyncRead addparam failed\n", active_ids[i]);
+			fprintf(stderr, "[ID:%03d] groupSyncRead addparam failed\n", active_joint_ids[i]);
 			exit(1);
 		}
+	}
+
+	// Set the speed of each motor
+	for(int i = 0; i < active_joint_ids.size(); i++)
+	{
+		write_movement_speed(active_joint_ids[i], joint_configs[i].speed);
 	}
 
 	initialized = true;
@@ -165,24 +185,24 @@ int DynamixelPositionInterface::connect(const int &baudrate)
 	uint8_t dxl_error = 0;  
 	int dxl_comm_result = COMM_TX_FAIL;
 
-	for(int i = 0; i < active_ids.size(); i++)
+	for(int i = 0; i < active_joint_ids.size(); i++)
 	{
-		dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, active_ids[i], ADDR_TORQUE_ENABLE, TORQUE_ENABLE, &dxl_error);
+		dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, active_joint_ids[i], ADDR_TORQUE_ENABLE, TORQUE_ENABLE, &dxl_error);
 		if (dxl_comm_result != COMM_SUCCESS)
 		{
-			printf("\nUnable to connect to Dynamixel %d\n\n", active_ids[i]);
+			printf("\nUnable to connect to Dynamixel %d\n\n", active_joint_ids[i]);
 			printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
 			return 0;
 		}
 		else if (dxl_error != 0)
 		{
-			printf("\nUnable to connect to Dynamixel %d\n\n", active_ids[i]);
+			printf("\nUnable to connect to Dynamixel %d\n\n", active_joint_ids[i]);
 			printf("%s\n", packetHandler->getRxPacketError(dxl_error));
 			return 0;
 		}
 		else
 		{
-			printf("Dynamixel#%2d has been successfully connected \n", active_ids[i]);
+			printf("Dynamixel#%2d has been successfully connected \n", active_joint_ids[i]);
 		}
 	}
 
@@ -199,24 +219,24 @@ int DynamixelPositionInterface::disconnect()
     int dxl_comm_result = COMM_TX_FAIL;
     
 	// Disconnect all other motors
-	for(int i = 0; i < active_ids.size(); i++)
+	for(int i = 0; i < active_joint_ids.size(); i++)
 	{
-		dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, active_ids[i], ADDR_TORQUE_ENABLE, TORQUE_DISABLE, &dxl_error);
+		dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, active_joint_ids[i], ADDR_TORQUE_ENABLE, TORQUE_DISABLE, &dxl_error);
         if (dxl_comm_result!= COMM_SUCCESS)
         {
-            printf("\nUnable to disconnect from Dynamixel %d\n\n", active_ids[i]);
+            printf("\nUnable to disconnect from Dynamixel %d\n\n", active_joint_ids[i]);
             printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
             return 0;
         }
         else if (dxl_error!= 0)
         {
-            printf("\nUnable to disconnect from Dynamixel %d\n\n", active_ids[i]);
+            printf("\nUnable to disconnect from Dynamixel %d\n\n", active_joint_ids[i]);
             printf("%s\n", packetHandler->getRxPacketError(dxl_error));
             return 0;
         }
         else
 		{
-            printf("Dynamixel#%d has been successfully disconnected \n", active_ids[i]);
+            printf("Dynamixel#%d has been successfully disconnected \n", active_joint_ids[i]);
         }	
 	}
 
@@ -234,7 +254,7 @@ int DynamixelPositionInterface::write_position(std::vector<int> ids, std::vector
 		fprintf(stderr, "[set_goal_position] Size mismatch between list of IDs and Positions.\n");
         return 0;
 	}
-	if(IsSubset(active_ids, ids) != true)
+	if(IsSubset(active_joint_ids, ids) != true)
 	{
 		fprintf(stderr, "[set_goal_position] Some motor IDs provided were not initialized.\n");
         return 0;
@@ -243,7 +263,12 @@ int DynamixelPositionInterface::write_position(std::vector<int> ids, std::vector
 	// Convert positions from degrees to ticks and add zero offset
 	for(int i = 0; i < positions.size(); i++)
 	{
-		positions[i] = positions[i] / MULT_POSITION;
+		positions[i] = positions[i] / MULT_POSITION + joint_configs[ids[i]].zero_tick;
+		// Warn if positions are out of range
+		if(positions[i] < joint_configs[ids[i]].min_tick || positions[i] > joint_configs[ids[i]].max_tick)
+		{
+			printf("%s[WARN]: [set_goal_position] Position %d out of range for Dynamixel %d%s\n", CONSOLE_MSG_WARN, positions[i], ids[i], CONSOLE_DEFAULT);
+		}
 	}
 
 	int dxl_error = 0;
@@ -280,9 +305,9 @@ int DynamixelPositionInterface::write_position(std::vector<int> ids, std::vector
 	return 1;
 }
 
-int DynamixelPositionInterface::write_movement_speed(float movement_speed)
+int DynamixelPositionInterface::write_movement_speed(int id, float movement_speed)
 {
-	printf("Setting movement speed to %03f degrees per second\n", movement_speed);
+	printf("[INFO] Setting movement speed for joint id %d to %03f degrees per second\n", id, movement_speed);
 
 	// Convert speed from degrees per second to rotations per minute
 	movement_speed = movement_speed / MULT_SPEED;
@@ -293,20 +318,18 @@ int DynamixelPositionInterface::write_movement_speed(float movement_speed)
 	uint8_t param_goal_velocity[4];
 
 	// Load goal velocity to buffer
-    for(int i = 0; i < active_ids.size(); i++)
-	{
-		param_goal_velocity[0] = DXL_LOBYTE(DXL_LOWORD(movement_speed));
-		param_goal_velocity[1] = DXL_HIBYTE(DXL_LOWORD(movement_speed));
-		param_goal_velocity[2] = DXL_LOBYTE(DXL_HIWORD(movement_speed));
-		param_goal_velocity[3] = DXL_HIBYTE(DXL_HIWORD(movement_speed));
+   	param_goal_velocity[0] = DXL_LOBYTE(DXL_LOWORD(movement_speed));
+	param_goal_velocity[1] = DXL_HIBYTE(DXL_LOWORD(movement_speed));
+	param_goal_velocity[2] = DXL_LOBYTE(DXL_HIWORD(movement_speed));
+	param_goal_velocity[3] = DXL_HIBYTE(DXL_HIWORD(movement_speed));
 
-		dxl_addparam_result = groupSyncWriteMoveSpeed->addParam(active_ids[i], param_goal_velocity);
-		if (dxl_addparam_result != true)
-		{
-			fprintf(stderr, "[ID:%03d] groupSyncWriteMoveSpeed addparam failed", active_ids[i]);
-			return 0;
-		}
+	dxl_addparam_result = groupSyncWriteMoveSpeed->addParam(id, param_goal_velocity);
+	if (dxl_addparam_result != true)
+	{
+		fprintf(stderr, "[ID:%03d] groupSyncWriteMoveSpeed addparam failed", id);
+		return 0;
 	}
+	
 
 	// Send buffer to servos
 	dxl_comm_result = groupSyncWriteMoveSpeed->txPacket();
@@ -337,9 +360,9 @@ DynamixelStatus DynamixelPositionInterface::read_status()
 
 	DynamixelStatus status;
 	status.timestamp = timestamp;
-	status.position.resize(active_ids.size());
-	status.velocity.resize(active_ids.size());
-	status.current.resize(active_ids.size());
+	status.position.resize(active_joint_ids.size());
+	status.velocity.resize(active_joint_ids.size());
+	status.current.resize(active_joint_ids.size());
 	
 	// Check for comms success
 	if (dxl_comm_result != COMM_SUCCESS)
@@ -349,27 +372,27 @@ DynamixelStatus DynamixelPositionInterface::read_status()
 	}
 
 	// Check for servo errors
-	for(int i = 0; i < active_ids.size(); i++)
+	for(int i = 0; i < active_joint_ids.size(); i++)
 	{
-		if(groupSyncRead->getError(active_ids[i], &dxl_error))
+		if(groupSyncRead->getError(active_joint_ids[i], &dxl_error))
 		{
-			printf("[ID:%03d] %s\n", active_ids[i], packetHandler->getRxPacketError(dxl_error));
+			printf("[ID:%03d] %s\n", active_joint_ids[i], packetHandler->getRxPacketError(dxl_error));
 		}
 	}
 
 
 	// Save data from buffer
-	for(int i = 0; i < active_ids.size(); i++)
+	for(int i = 0; i < active_joint_ids.size(); i++)
 	{
-		 dxl_getdata_result = groupSyncRead->isAvailable(active_ids[i], read_start_address, read_data_length);
+		 dxl_getdata_result = groupSyncRead->isAvailable(active_joint_ids[i], read_start_address, read_data_length);
 		 if (dxl_getdata_result != true)
 		 {
-			fprintf(stderr, "[ID:%03d] groupSyncRead getdata failed\n", active_ids[i]);
+			fprintf(stderr, "[ID:%03d] groupSyncRead getdata failed\n", active_joint_ids[i]);
 		 }
 
-		 status.position[i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION)));
-		 status.velocity[i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY));
-		 status.current[i] = MULT_CURRENT * twos_complement(groupSyncRead->getData(active_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT));
+		 status.position[i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION)) - joint_configs[active_joint_ids[i]].zero_tick);
+		 status.velocity[i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY));
+		 status.current[i] = MULT_CURRENT * twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT));
 	}
 
 	return status;

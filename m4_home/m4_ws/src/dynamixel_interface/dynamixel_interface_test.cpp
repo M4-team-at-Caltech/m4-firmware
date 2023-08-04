@@ -34,10 +34,6 @@ void send_command_looped(DynamixelPositionInterface *dxl,vector<int> id_list,vec
 	{
 		// Send a simple movement command to the Dynamixels
 		dxl->write_position(id_list, goal_positions);
-		if(latch_engage)
-			dxl->latch_engage();
-		else
-			dxl->latch_disengage();
 
 		for(int i=0; i<goal_positions.size(); i++)
 		{
@@ -61,7 +57,7 @@ int main(int argc, char *argv[])
 	// Verify that the port name is correct. This can be different on your system
 	// Baudrate is set using the Dynamixel Wizard on the Dynamixel Servo directly
 	const char* port = string("/dev/ttyUSB0").c_str();
-	int baudrate = 4000000;
+	int baudrate = 115200;
 	
 	// List of dynamixel IDs to actuate for this test
 	vector<int> id_list = {1, 2};	
@@ -69,9 +65,6 @@ int main(int argc, char *argv[])
 	
     // Create a DynamixelInterface object
 	DynamixelPositionInterface dxl(port, baudrate, id_list);
-
-	// Set movement speed in degrees per second
-	dxl.write_movement_speed(60.0);
 
     // Set the goal positions
 	thread cmd_thread(send_command_looped, &dxl, id_list, goal_positions);

@@ -37,6 +37,15 @@ struct DynamixelStatus
 	std::vector<float> current;		// Current in amps
 };
 
+struct JointConfig
+{
+	int id;
+	int zero_tick;
+	int max_tick;
+	int min_tick;
+	float speed; // Speed in degrees per second
+};
+
 class DynamixelPositionInterface
 {
 	public:
@@ -51,9 +60,7 @@ class DynamixelPositionInterface
 
 		// Command functions
 		int write_position(std::vector<int> ids, std::vector<float> positions);
-		int write_movement_speed(float movement_speed);
-
-		void enable_debug_msgs();
+		int write_movement_speed(int id, float movement_speed);
 
 		void stop();
 		
@@ -83,15 +90,10 @@ class DynamixelPositionInterface
 			// Default setting
 		int TORQUE_ENABLE;              // Value for enabling the torque
 		int TORQUE_DISABLE;             // Value for disabling the torque
-		int DXL_MINIMUM_POSITION_VALUE;	// Dynamixel will rotate between this value
-		int DXL_MAXIMUM_POSITION_VALUE; // and this value (note that the Dynamixel would not move when the position value is out of movable range. Check e-manual about the range of the Dynamixel you use.)
 
 		// Flags
 		bool initialized;
 		bool running;
-
-		// Debug flag
-		bool debug;
 
 		// Dynamixel Interface handles
 		dynamixel::PortHandler *portHandler;
@@ -101,7 +103,8 @@ class DynamixelPositionInterface
 		dynamixel::GroupSyncRead *groupSyncRead;
 		
 		// Motor IDs being managed
-		std::vector<int> active_ids;
+		std::vector<int> active_joint_ids;
+		std::vector<JointConfig> joint_configs;
 		
 		// Status read address and data length
 		int read_start_address;
