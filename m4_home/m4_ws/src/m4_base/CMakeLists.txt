@@ -2,17 +2,23 @@ cmake_minimum_required(VERSION 3.0.2)
 project(m4_base)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+
+add_subdirectory(third-party/yaml-cpp)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
-  dynamixel_interface
-)
+find_package(
+	catkin REQUIRED
+	)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
+
+# Set project root directory
+add_definitions("-DPROJECT_ROOT_DIR=\"${PROJECT_SOURCE_DIR}\"")
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -101,10 +107,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES m4_base
-#  CATKIN_DEPENDS dynamixel_interface
-#  DEPENDS system_lib
+  INCLUDE_DIRS include include/dynamixel_sdk third-party/yaml-cpp/include
+  LIBRARIES DynamixelInterface
+  #CATKIN_DEPENDS other_catkin_pkg
+  #DEPENDS system_lib
 )
 
 ###########
@@ -114,14 +120,59 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
-  ${catkin_INCLUDE_DIRS}
+include
+include/dynamixel_sdk
+third-party/yaml-cpp/include
+${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/m4_base.cpp
-# )
+# DynamixelInterface library
+add_library(DynamixelInterface STATIC
+    src/DynamixelInterface.cpp
+    include/DynamixelInterface.h
+)
+
+# Utils library
+add_library(utils STATIC
+    src/utils.cpp
+    include/utils.h
+)
+
+# Logger library
+add_library(Logger STATIC
+    src/Logger.cpp
+    include/Logger.h
+)
+
+# Dynamixel SDK
+add_library(dynamixel_sdk STATIC
+	src/dynamixel_sdk/group_bulk_read.cpp
+	src/dynamixel_sdk/group_bulk_write.cpp
+	src/dynamixel_sdk/group_sync_read.cpp
+	src/dynamixel_sdk/group_sync_write.cpp
+	src/dynamixel_sdk/packet_handler.cpp
+	src/dynamixel_sdk/port_handler.cpp
+	src/dynamixel_sdk/port_handler_arduino.cpp
+	src/dynamixel_sdk/port_handler_linux.cpp
+	src/dynamixel_sdk/port_handler_mac.cpp
+	src/dynamixel_sdk/port_handler_windows.cpp
+	src/dynamixel_sdk/protocol1_packet_handler.cpp
+	src/dynamixel_sdk/protocol2_packet_handler.cpp
+	include/dynamixel_sdk/dynamixel_sdk.h
+	include/dynamixel_sdk/group_bulk_read.h
+	include/dynamixel_sdk/group_bulk_write.h
+	include/dynamixel_sdk/group_sync_read.h
+	include/dynamixel_sdk/group_sync_write.h
+	include/dynamixel_sdk/packet_handler.h
+	include/dynamixel_sdk/port_handler.h
+	include/dynamixel_sdk/port_handler_arduino.h
+	include/dynamixel_sdk/port_handler_linux.h
+	include/dynamixel_sdk/port_handler_mac.h
+	include/dynamixel_sdk/port_handler_windows.h
+	include/dynamixel_sdk/protocol1_packet_handler.h
+	include/dynamixel_sdk/protocol2_packet_handler.h
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -131,7 +182,31 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/m4_base_node.cpp)
+set(UNIT_TEST_SCRIPTS
+	# Stored in test-scripts/unit-tests
+	dynamixel_interface_test
+)
+
+set(COMMON_LIBRARIES
+	DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+)
+
+# Set up the unit tests
+foreach(SCRIPT IN LISTS UNIT_TEST_SCRIPTS)
+	# List of source files
+	set(SOURCES unit-tests/${SCRIPT}.cpp)
+
+	# Add the executables
+	add_executable(${SCRIPT} ${SOURCES})
+
+	# Link common libraries
+	target_link_libraries(${SCRIPT} ${COMMON_LIBRARIES})
+
+	# Set output location
+	set_target_properties(${SCRIPT} 
+		PROPERTIES 
+		OUTPUT_NAME ${SCRIPT} PREFIX "")
+endforeach()
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -195,7 +270,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_m4_base.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_dynamixel_interface.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

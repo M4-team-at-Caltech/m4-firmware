@@ -2,13 +2,13 @@
 #include <string>
 #include "DynamixelInterface.h"
 
-
 class M4Base
 {
 	public:
 		M4Base();
 
 		// Transformations
+		void stand();
 		void crouch();
 		void sit();
 		void uav();
@@ -16,5 +16,5 @@ class M4Base
 
 	private:
 		DynamixelInterface dxl;
-
+		
 };
