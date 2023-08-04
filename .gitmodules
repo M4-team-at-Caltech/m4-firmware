@@ -1,3 +1,1 @@
-[submodule "m4_home/m4_ws/src/dynamixel_interface/third-party/yaml-cpp"]
-	path = m4_home/m4_ws/src/dynamixel_interface/third-party/yaml-cpp
-	url = git@github.com:jbeder/yaml-cpp.git
+
