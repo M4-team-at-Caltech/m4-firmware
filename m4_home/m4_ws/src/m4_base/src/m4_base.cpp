@@ -21,9 +21,14 @@ M4Base::M4Base()
 	YAML::Node config = YAML::LoadFile(configFilePath);
 
 	joint_state_publisher = nh.advertise<sensor_msgs::JointState>("/m4/joint_states", 10);
-	M4Commands_subscriber = nh.subscribe("/m4/M4Cmd", 10, &M4Base::command_callback, this);
+	M4Commands_subscriber = nh.subscribe("/m4/cmd", 10, &M4Base::command_callback, this);
 
 	dxl.init(config["interface_port"].as<std::string>().c_str(), config["baud_rate"].as<int>(), config["active_motor_ids"].as<std::vector<int>>());
+}
+
+M4Base::~M4Base()
+{
+	dxl.stop();
 }
 
 void M4Base::status_read_loop()
@@ -91,3 +96,29 @@ void M4Base::custom_joint_pos(const std::vector<int> &ids, const std::vector<flo
 {
 	dxl.write_position(ids, positions);
 }
+
+void M4Base::stand()
+{
+
+}
+
+void M4Base::crouch()
+{
+
+}
+
+void M4Base::sit()
+{
+
+}
+
+void M4Base::uav()
+{
+
+}
+
+void M4Base::mip()
+{
+
+}
+

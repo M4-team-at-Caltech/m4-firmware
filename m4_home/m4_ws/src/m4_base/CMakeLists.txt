@@ -11,7 +11,8 @@ add_subdirectory(third-party/yaml-cpp)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(
-	catkin REQUIRED
+	catkin REQUIRED COMPONENTS
+	roscpp
 	m4_msgs
 	)
 
@@ -189,6 +190,18 @@ add_library(dynamixel_sdk STATIC
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
+
+# Add the executables
+add_executable(m4_base_bringup
+	src/m4_base_bringup.cpp
+)
+
+# Link common libraries
+target_link_libraries(m4_base_bringup 
+	m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+	${catkin_LIBRARIES}
+)
+
 set(UNIT_TEST_SCRIPTS
 	# Stored in test-scripts/unit-tests
 	dynamixel_interface_test
@@ -208,11 +221,6 @@ foreach(SCRIPT IN LISTS UNIT_TEST_SCRIPTS)
 
 	# Link common libraries
 	target_link_libraries(${SCRIPT} ${COMMON_LIBRARIES})
-
-	# Set output location
-	set_target_properties(${SCRIPT} 
-		PROPERTIES 
-		OUTPUT_NAME ${SCRIPT} PREFIX "")
 endforeach()
 
 ## Rename C++ executable without prefix

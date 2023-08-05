@@ -18,7 +18,7 @@ class M4Base
 {
 	public:
 		M4Base();
-
+		~M4Base();
 
 	private:
 		DynamixelPositionInterface dxl;
