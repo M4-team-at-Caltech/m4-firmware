@@ -32,6 +32,7 @@
 struct DynamixelStatus
 {
 	float timestamp;				// Time stamp in nanoseconds since epoch
+	std::vector<std::string> joint_names;// Joint names
 	std::vector<float> position;	// Position in degrees from ZERO_POSITION
 	std::vector<float> velocity;	// Velocity in degrees per second
 	std::vector<float> current;		// Current in amps
@@ -105,6 +106,7 @@ class DynamixelPositionInterface
 		
 		// Motor IDs being managed
 		std::vector<int> active_joint_ids;
+		std::vector<std::string> active_joint_names;
 		std::vector<JointConfig> joint_configs;
 		
 		// Status read address and data length

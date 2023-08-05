@@ -1,4 +1,6 @@
-# Config file that maps robot joints to dynamixels and sets properties
+interface_port: "/dev/ttyUSB0"
+baudrate: 115200
+active_motor_ids: [1, 2, 3, 4]
 
 # Joint names must match joint configurations below
 joint_names: 

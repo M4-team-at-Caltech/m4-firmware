@@ -5,7 +5,6 @@
 #include <thread>
 #include <algorithm>
 #include <iostream>
-#include <iostream>
 #include "yaml-cpp/yaml.h"
 #include "utils.h"
 #include "ConsoleFormatting.h"
@@ -31,6 +30,7 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 {
 	active_joint_ids = ids;
 	joint_configs.resize(active_joint_ids.size());
+	active_joint_names.resize(active_joint_ids.size());
 	
 	// Load configuration variables
 	//---------------------------------------------------------------------------------------------------------------
@@ -84,6 +84,7 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 			jconfig.min_tick = config["joints"][joint_names[i]]["min_tick"].as<int>();
 			jconfig.speed = config["joints"][joint_names[i]]["speed"].as<float>();
 			joint_configs[j_index - active_joint_ids.begin()] = jconfig;
+			active_joint_names[j_index - active_joint_ids.begin()] = joint_names[i];
 		}
 	}
 	
@@ -412,11 +413,12 @@ DynamixelStatus DynamixelPositionInterface::read_status()
 		 {
 			fprintf(stderr, "[ID:%03d] groupSyncRead getdata failed\n", active_joint_ids[i]);
 		 }
-
 		 status.position[i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION)) - joint_configs[active_joint_ids[i]].zero_tick);
 		 status.velocity[i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY));
 		 status.current[i] = MULT_CURRENT * twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT));
 	}
+	
+	status.joint_names = active_joint_names;
 
 	return status;
 }

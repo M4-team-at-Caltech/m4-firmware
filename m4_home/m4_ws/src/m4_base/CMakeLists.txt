@@ -12,6 +12,7 @@ add_subdirectory(third-party/yaml-cpp)
 ## is used, also find other catkin packages
 find_package(
 	catkin REQUIRED
+	m4_msgs
 	)
 
 ## System dependencies are found with CMake's conventions
@@ -53,8 +54,7 @@ add_definitions("-DPROJECT_ROOT_DIR=\"${PROJECT_SOURCE_DIR}\"")
 ## Generate messages in the 'msg' folder
 # add_message_files(
 #   FILES
-#   Message1.msg
-#   Message2.msg
+#   M4Cmd.msg
 # )
 
 ## Generate services in the 'srv' folder
@@ -74,7 +74,8 @@ add_definitions("-DPROJECT_ROOT_DIR=\"${PROJECT_SOURCE_DIR}\"")
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
+#   std_msgs
+#   sensor_msgs
 # )
 
 ################################################
@@ -109,8 +110,8 @@ add_definitions("-DPROJECT_ROOT_DIR=\"${PROJECT_SOURCE_DIR}\"")
 catkin_package(
   INCLUDE_DIRS include include/dynamixel_sdk third-party/yaml-cpp/include
   LIBRARIES DynamixelInterface
-  #CATKIN_DEPENDS other_catkin_pkg
-  #DEPENDS system_lib
+  CATKIN_DEPENDS m4_msgs
+#   DEPENDS message_runtime
 )
 
 ###########
@@ -143,6 +144,12 @@ add_library(utils STATIC
 add_library(Logger STATIC
     src/Logger.cpp
     include/Logger.h
+)
+
+# M4_base library
+add_library(m4_base STATIC
+    src/m4_base.cpp
+    include/m4_base.h
 )
 
 # Dynamixel SDK
