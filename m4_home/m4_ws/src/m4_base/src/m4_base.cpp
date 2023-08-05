@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <thread>
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <sensor_msgs/JointState.h>
@@ -22,8 +23,10 @@ M4Base::M4Base()
 
 	joint_state_publisher = nh.advertise<sensor_msgs::JointState>("/m4/joint_states", 10);
 	M4Commands_subscriber = nh.subscribe("/m4/cmd", 10, &M4Base::command_callback, this);
+	std::vector<int> active_ids = config["active_motor_ids"].as<std::vector<int>>();
 
-	dxl.init(config["interface_port"].as<std::string>().c_str(), config["baud_rate"].as<int>(), config["active_motor_ids"].as<std::vector<int>>());
+	dxl.init(config["interface_port"].as<std::string>().c_str(), config["baudrate"].as<int>(), active_ids);
+	status_read_thread = std::thread(&M4Base::status_read_loop, this);
 }
 
 M4Base::~M4Base()
@@ -36,7 +39,9 @@ void M4Base::status_read_loop()
 	ros::Rate loop_rate(200);
     while(ros::ok())
     {
+		ROS_INFO_ONCE("Started status read thread.\n");
 		DynamixelStatus joint_states = dxl.read_status();
+		ROS_INFO_ONCE("Got first status message\n");
 		sensor_msgs::JointState joint_state_msg;
 		joint_state_msg.header.stamp = ros::Time::now();
 		joint_state_msg.name = joint_states.joint_names;

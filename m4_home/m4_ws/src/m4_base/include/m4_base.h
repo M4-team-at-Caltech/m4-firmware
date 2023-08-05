@@ -1,5 +1,6 @@
 #include <vector>
 #include <string>
+#include <thread>
 #include <ros/ros.h>
 #include "DynamixelInterface.h"
 #include "m4_msgs/M4Cmd.h"
@@ -26,6 +27,7 @@ class M4Base
 		ros::Publisher joint_state_publisher;
 		ros::Subscriber M4Commands_subscriber;
 
+		std::thread status_read_thread;
 		void status_read_loop();
 		void command_callback(m4_msgs::M4Cmd cmd);
 		// Transformations
