@@ -1,6 +1,10 @@
 interface_port: "/dev/ttyUSB0"
 baudrate: 115200
-active_motor_ids: [1, 2, 3, 4]
+
+log_path: /home/m4/data
+log_buffer_size: 400
+
+control_loop_rate: 200
 
 # Joint names must match joint configurations below
 joint_names: 

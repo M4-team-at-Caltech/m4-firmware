@@ -4,7 +4,7 @@
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv,"m4_base_node");
-	M4Base m4;
+	M4Base m4(true);
 	ros::spin();
 	return 0;
 }
