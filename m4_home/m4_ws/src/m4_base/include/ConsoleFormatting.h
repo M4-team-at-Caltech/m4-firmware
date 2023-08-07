@@ -14,7 +14,7 @@
 #define CONSOLE_UNDERLINE "\033[4m"
 
 #define CONSOLE_MSG_INFO "\033[0m"
-#define CONSOLE_MSG_ERROR "\033[131m"
-#define CONSOLE_MSG_WARN "\033[133m"
+#define CONSOLE_MSG_ERROR "\033[31m"
+#define CONSOLE_MSG_WARN "\033[33m"
 
 #endif

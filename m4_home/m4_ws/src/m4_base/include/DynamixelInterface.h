@@ -31,11 +31,11 @@
 
 struct DynamixelStatus
 {
-	float timestamp;				// Time stamp in nanoseconds since epoch
-	std::vector<std::string> joint_names;// Joint names
-	std::vector<float> position;	// Position in degrees from ZERO_POSITION
-	std::vector<float> velocity;	// Velocity in degrees per second
-	std::vector<float> current;		// Current in amps
+	float timestamp;						// Time stamp in nanoseconds since epoch
+	std::vector<std::string> joint_names;	// Joint names
+	std::vector<float> position;			// Position in degrees from ZERO_POSITION
+	std::vector<float> velocity;			// Velocity in degrees per second
+	std::vector<float> current;				// Current in amps
 };
 
 struct JointConfig

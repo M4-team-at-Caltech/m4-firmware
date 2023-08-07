@@ -8,42 +8,44 @@
 #define deg2rad(x) ((x)*M_PI/180.0)
 #define rad2deg(x) ((x)*180.0/M_PI)
 
-M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_ids(active_joint_ids), log_status(log_status), quit(false), state_updated(false), command_queue(20)
+M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_ids(active_joint_ids), log_status(false), quit(false), state_updated(false), command_queue(20), current_configuration(M4Configurations::INIT)
 {
 	std::string configFilePath = std::string(PROJECT_ROOT_DIR) + "/config/robot_config.yaml";
 	YAML::Node config = YAML::LoadFile(configFilePath);
 	
 	CONTROL_LOOP_RATE = config["control_loop_rate"].as<float>();
 	LOG_PATH = config["log_path"].as<std::string>();
-	
+
 	LOG_BUFFER_SIZE = config["log_buffer_size"].as<int>();
 	robot_state.reserve(LOG_BUFFER_SIZE);
 
-	std::string configFilePath = std::string(PROJECT_ROOT_DIR) + "/config/transformations.yaml";
-	YAML::Node config = YAML::LoadFile(configFilePath);
+	std::string interface_port = config["interface_port"].as<std::string>();
+	int baudrate = config["baudrate"].as<int>();
 
-	stand_configuration = config["stand"].as<std::vector<float>>();
-	crouch_configuration = config["crouch"].as<std::vector<float>>();
-	sit_configuration = config["sit"].as<std::vector<float>>();
-	uav_configuration = config["uav"].as<std::vector<float>>();
-	mip_configuration = config["mip"].as<std::vector<float>>();
-	transform_stand_to_crouch = config["stand_to_crouch"].as<std::vector<std::vector<float>>>();
-	transform_stand_to_sit = config["stand_to_sit"].as<std::vector<std::vector<float>>>();
-	transform_stand_to_uav = config["stand_to_uav"].as<std::vector<std::vector<float>>>();
-	transform_stand_to_mip = config["stand_to_mip"].as<std::vector<std::vector<float>>>();
+	all_joint_ids = config["all_joint_ids"].as<std::vector<int>>();
+	all_joint_names = config["joint_names"].as<std::vector<std::string>>();
+	active_joint_names = get_active_joint_names();
 
-	dxl.init(config["interface_port"].as<std::string>().c_str(), config["baudrate"].as<int>(), active_joint_ids);
+	stand_configuration = get_active_joint_positions(config["config_stand"].as<std::vector<float>>());
+	crouch_configuration = get_active_joint_positions(config["config_crouch"].as<std::vector<float>>());
+	sit_configuration = get_active_joint_positions(config["config_sit"].as<std::vector<float>>());
+	uav_configuration = get_active_joint_positions(config["config_uav"].as<std::vector<float>>());
+	mip_configuration = get_active_joint_positions(config["config_mip"].as<std::vector<float>>());
 
-	execute_stand();
-	
+	dxl.init(interface_port.c_str(), baudrate, active_joint_ids);
+
 	control_thread = std::thread(&M4Base::control_loop, this);
     set_log_status(log_status);
+	
+	stand();
 }
 
 M4Base::~M4Base()
 {
 	quit = true;
 	control_thread.join();
+	if(log_status)
+		log_thread.join();
 	dxl.stop();
 }
 
@@ -57,36 +59,210 @@ void M4Base::control_loop()
 	double dt, sleep_for;
 
 	M4Commands next_cmd;
+	std::vector<std::string> commands = {"STAND", "CROUCH", "SIT", "UAV", "MIP", "CUSTOM"};
+	bool command_active = false;
+	int command_step = 0;
 
     while(!quit)
     {
+
 		update_state();
 
 		// Execute commands
-		if(!command_queue.empty())
+		if(!command_queue.empty() || command_active)
 		{
-			next_cmd = command_queue.pop();
-			printf("%s[WARN]: Got command %d\n", CONSOLE_MSG_WARN, next_cmd);
+			if(!command_active)
+			{
+				next_cmd = command_queue.pop();
+				printf("%s[WARN]: Got command %s%s\n", CONSOLE_MSG_WARN, commands[next_cmd].c_str(), CONSOLE_DEFAULT);
+			}
 
 			switch(next_cmd)
 			{
-				case M4Commands::STAND:
-					execute_stand();
+				case M4Commands::CMD_STAND:
+					switch(current_configuration)
+					{
+						case M4Configurations::CROUCH:
+						case M4Configurations::SIT:
+						case M4Configurations::CUSTOM:
+						case M4Configurations::STAND:
+						case M4Configurations::INIT:
+							// Step 1: Move to Standing
+							if(command_step == 0)
+							{
+								dxl.write_position(active_joint_ids, stand_configuration);
+								gait_start = std::chrono::system_clock::now();
+								command_step = 1;
+								command_active = true;
+							}
+
+							// Complete
+							if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+							{
+								printf("[INFO] Stand Transformation complete!\n");
+								command_step = 0;
+								command_active = false;
+								current_configuration = M4Configurations::STAND;
+							}
+
+							break;
+
+						// ---------------------------------------------------------
+						// Transformation from UAV to STANDING
+						// ---------------------------------------------------------
+						case M4Configurations::UAV:
+						case M4Configurations::MIP:
+							// Step 1: Move to crouch
+							if(command_step == 0)
+							{
+								command_step = 1;
+								dxl.write_position(active_joint_ids, crouch_configuration);
+								gait_start = std::chrono::system_clock::now();
+								command_active = true;
+							}
+
+							// Step 2: Move to stand
+							if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 5 && command_step == 1)
+							{
+								command_step = 2;
+								dxl.write_position(active_joint_ids, stand_configuration);
+								gait_start = std::chrono::system_clock::now();
+							}
+
+							// Complete
+							if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 2)
+							{
+								printf("[INFO] Stand Transformation complete!\n");
+								command_step = 0;
+								command_active = false;
+								current_configuration = M4Configurations::STAND;
+							}
+
+							break;
+					}
+
                     break;
-				case M4Commands::CROUCH:
-					execute_crouch();
+
+				case M4Commands::CMD_CROUCH:
+					if(current_configuration == M4Configurations::STAND)
+					{
+						// Step 1: Move to crouch position
+						if(command_step == 0)
+						{
+							dxl.write_position(active_joint_ids, crouch_configuration);
+							gait_start = std::chrono::system_clock::now();
+							command_step = 1;
+							command_active = true;
+						}
+
+						// Complete
+						if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+						{
+							printf("[INFO] Crouch Transformation complete!\n");
+							command_step = 0;
+							command_active = false;
+							current_configuration = M4Configurations::CROUCH;
+						}
+					}
+
+					else
+					{
+						printf("%s[WARN] Transformation defined only from standing configuration. Please move to standing configuration.%s\n", CONSOLE_MSG_WARN, CONSOLE_DEFAULT);
+					}
+
 					break;
-				case M4Commands::SIT:
-					execute_sit();
+				case M4Commands::CMD_SIT:
 					break;
-				case M4Commands::UAV:
-					execute_uav();
+				case M4Commands::CMD_UAV:
+					if(current_configuration == M4Configurations::STAND)
+					{
+						// Step 1: Move to crouch position
+						if(command_step == 0)
+						{
+							command_step = 1;
+							dxl.write_position(active_joint_ids, crouch_configuration);
+							gait_start = std::chrono::system_clock::now();
+							command_active = true;
+						}
+
+						// Step 2: Move to UAV position
+						if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+						{
+							command_step = 2;
+							dxl.write_position(active_joint_ids, uav_configuration);
+							gait_start = std::chrono::system_clock::now();
+						}
+
+						// Complete
+						if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 5 && command_step == 2)
+						{
+							printf("[INFO] UAV Transformation complete!\n");
+							command_step = 0;
+							command_active = false;
+							current_configuration = M4Configurations::UAV;
+						}
+					}
+
+					else
+					{
+						printf("%s[WARN] Transformation defined only from standing configuration. Please move to standing configuration.%s\n", CONSOLE_MSG_WARN, CONSOLE_DEFAULT);
+					}
+
 					break;
-				case M4Commands::MIP:
-					execute_mip();
+				case M4Commands::CMD_MIP:
+					if(current_configuration == M4Configurations::STAND)
+					{
+						// Step 1: Move to crouch position
+						if(command_step == 0)
+						{
+							command_step = 1;
+							dxl.write_position(active_joint_ids, crouch_configuration);
+							gait_start = std::chrono::system_clock::now();
+							command_active = true;
+						}
+
+						// Step 2: Move to UAV position
+						if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+						{
+							command_step = 2;
+							dxl.write_position(active_joint_ids, mip_configuration);
+							gait_start = std::chrono::system_clock::now();
+						}
+
+						// Complete
+						if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 5 && command_step == 2)
+						{
+							printf("[INFO] MIP Transformation complete!\n");
+							command_step = 0;
+							command_active = false;
+							current_configuration = M4Configurations::MIP;
+						}
+					}
+
+					else
+					{
+						printf("%s[WARN] Transformation defined only from standing configuration. Please move to standing configuration.%s\n", CONSOLE_MSG_WARN, CONSOLE_DEFAULT);
+					}
+
 					break;
-				case M4Commands::CUSTOM:
-					execute_custom_joint_pos();
+				case M4Commands::CMD_CUSTOM:
+					// Step 1: Move to positions
+					if(command_step == 0)
+					{
+						dxl.write_position(joint_position_cmd_ids, joint_position_cmd);
+						gait_start = std::chrono::system_clock::now();
+						command_step = 1;
+						command_active = true;
+					}
+
+					// Complete
+					if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= movement_time && command_step == 1)
+					{
+						printf("[INFO] Movement complete!\n");
+						command_step = 0;
+						command_active = false;
+					}
+
 					break;
 			}
 		}
@@ -199,8 +375,10 @@ void M4Base::log_status_loop()
 	}
 
 	// Save the remaining data from buffer into file before stopping logging thread
+	printf("[INFO] Finishing logging...\n");
 	if(!robot_state.empty())
 	{
+		printf("[INFO] Saving remaining buffer...\n");
 		std::vector<std::vector<float>> data_position;
 		std::vector<std::vector<float>> data_velocity;
 		std::vector<std::vector<float>> data_current;
@@ -241,103 +419,6 @@ void M4Base::update_state()
 	state_updated = true;
 }
 
-RobotState M4Base::get_state()
-{
-	state_updated = false;
-	return robot_state.back();
-}
-
-void M4Base::custom_joint_pos(const std::vector<int> &ids, const std::vector<float> &positions)
-{
-	joint_position_cmd = positions;
-	joint_position_cmd_ids = ids;
-	command_queue.push(M4Commands::CUSTOM);
-}
-
-void M4Base::crouch(){
-	command_queue.push(M4Commands::CROUCH);
-}
-
-void M4Base::stand(){
-    command_queue.push(M4Commands::STAND);
-}
-
-void M4Base::sit(){
-    command_queue.push(M4Commands::SIT);
-}
-
-void M4Base::uav(){
-    command_queue.push(M4Commands::UAV);
-}
-
-void M4Base::mip(){
-    command_queue.push(M4Commands::MIP);
-}
-
-void M4Base::execute_custom_joint_pos()
-{
-	dxl.write_position(joint_position_cmd_ids, joint_position_cmd);
-	while(!is_moving()) active_sleep(0.01);
-}
-
-void M4Base::execute_stand()
-{
-
-	if(current_configuration == M4Configurations::CUSTOM)
-	{
-		printf("%s[ERROR] Transformation not defined from custom configuration to stand!\n", CONSOLE_MSG_ERROR);
-		return;
-    }
-
-	switch(current_configuration)
-	{
-		case M4Configurations::STAND:
-			return;
-		case M4Configurations::CROUCH:
-			dxl.write_position(active_joint_ids, std::vector<float>(active_joint_ids.size(), 0.0));
-			break;
-		case M4Configurations::SIT:
-			dxl.write_position(active_joint_ids, std::vector<float>(active_joint_ids.size(), 0.0));
-			break;
-		case M4Configurations::UAV:
-			dxl.write_position(active_joint_ids, crouch_configuration);
-            while(!is_moving()) active_sleep(0.01);
-			dxl.write_position(active_joint_ids, std::vector<float>(active_joint_ids.size(), 0.0));
-			break;
-		case M4Configurations::MIP:
-			dxl.write_position(active_joint_ids, crouch_configuration);
-            while(!is_moving()) active_sleep(0.01);
-			dxl.write_position(active_joint_ids, std::vector<float>(active_joint_ids.size(), 0.0));
-            break;
-		default:
-			printf("%s[ERROR] Transformation not defined!\n", CONSOLE_MSG_ERROR);
-			return;
-	}
-	
-	while(!is_moving()) active_sleep(0.01);
-	current_configuration = M4Configurations::STAND;
-}
-
-void M4Base::execute_crouch()
-{
-	// TODO: Implement
-}
-
-void M4Base::execute_sit()
-{
-	// TODO: Implement
-}
-
-void M4Base::execute_uav()
-{
-	// TODO: Implement
-}
-
-void M4Base::execute_mip()
-{
-	// TODO: Implement
-}
-
 bool M4Base::state_available()
 {
 	return state_updated;
@@ -349,9 +430,37 @@ RobotState M4Base::get_state()
 	return robot_state.back();
 }
 
-bool M4Base::is_moving()
+void M4Base::custom_joint_pos(const std::vector<int> &ids, const std::vector<float> &positions, float movement_time)
 {
-	return std::all_of(robot_state.back().velocities.begin(), robot_state.back().velocities.end(), [](float v){return v == 0.0;});
+	this->movement_time = movement_time;
+	joint_position_cmd = positions;
+	joint_position_cmd_ids = ids;
+	command_queue.push(M4Commands::CMD_CUSTOM);
+}
+
+void M4Base::crouch(){
+	command_queue.push(M4Commands::CMD_CROUCH);
+}
+
+void M4Base::stand(){
+    command_queue.push(M4Commands::CMD_STAND);
+}
+
+void M4Base::sit(){
+    command_queue.push(M4Commands::CMD_SIT);
+}
+
+void M4Base::uav(){
+    command_queue.push(M4Commands::CMD_UAV);
+}
+
+void M4Base::mip(){
+    command_queue.push(M4Commands::CMD_MIP);
+}
+
+M4Configurations M4Base::get_current_configuration()
+{
+	return current_configuration;
 }
 
 void RobotState::print()
@@ -362,3 +471,40 @@ void RobotState::print()
 	std::cout << "Current (A): "; for(int i=0; i<currents.size(); i++) std::cout << currents[i] << " "; std::cout << std::endl;
 	std::cout << std::endl;
 }
+
+std::vector<float> M4Base::get_active_joint_positions(const std::vector<float>& joint_positions) 
+{
+    std::vector<float> active_joint_positions;
+    
+    // Using a map for efficient look-up of joint position based on joint ID
+    std::unordered_map<int, float> joint_id_to_position;
+    for (size_t i = 0; i < all_joint_ids.size(); ++i) {
+        joint_id_to_position[all_joint_ids[i]] = joint_positions[i];
+    }
+    
+    // Populating the active_joint_positions vector
+    for (int id : active_joint_ids) {
+        active_joint_positions.push_back(joint_id_to_position[id]);
+    }
+    
+    return active_joint_positions;
+}
+
+std::vector<std::string> M4Base::get_active_joint_names() 
+{
+    std::vector<std::string> active_joint_names;
+    
+    // Using a map for efficient look-up of joint name based on joint ID
+    std::unordered_map<int, std::string> joint_id_to_name;
+    for (size_t i = 0; i < all_joint_ids.size(); ++i) {
+        joint_id_to_name[all_joint_ids[i]] = all_joint_names[i];
+    }
+    
+    // Populating the active_joint_names vector
+    for (int id : active_joint_ids) {
+        active_joint_names.push_back(joint_id_to_name[id]);
+    }
+    
+    return active_joint_names;
+}
+

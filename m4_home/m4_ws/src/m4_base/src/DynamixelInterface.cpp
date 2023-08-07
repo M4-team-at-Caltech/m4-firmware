@@ -422,4 +422,3 @@ DynamixelStatus DynamixelPositionInterface::read_status()
 
 	return status;
 }
-

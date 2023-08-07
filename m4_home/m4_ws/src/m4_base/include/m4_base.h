@@ -9,16 +9,17 @@
 
 enum M4Commands
 {
-	STAND,
-	CROUCH,
-	SIT,
-	UAV,
-	MIP,
-	CUSTOM
+	CMD_STAND,
+	CMD_CROUCH,
+	CMD_SIT,
+	CMD_UAV,
+	CMD_MIP,
+	CMD_CUSTOM
 };
 
 enum M4Configurations
 {
+	INIT,
 	STAND,
 	CROUCH,
 	SIT,
@@ -46,6 +47,7 @@ class M4Base
 		bool is_moving();
 		bool state_available();
 		RobotState get_state();
+		M4Configurations get_current_configuration();
 
 		// Transformations
 		void stand();
@@ -53,7 +55,7 @@ class M4Base
 		void sit();
 		void uav();
 		void mip();
-		void custom_joint_pos(const std::vector<int> &ids, const std::vector<float> &positions);
+		void custom_joint_pos(const std::vector<int> &ids, const std::vector<float> &positions, float movement_time);
 
 	private:
 		DynamixelPositionInterface dxl;
@@ -71,10 +73,15 @@ class M4Base
 		std::vector<std::vector<float>> transform_stand_to_uav;
 		std::vector<std::vector<float>> transform_stand_to_mip;
 
+		std::vector<float> get_active_joint_positions(const std::vector<float>& joint_positions);
+
 	// Logging related variables and functions
 		bool log_status;
+		std::vector<int> all_joint_ids;
 		std::vector<int> active_joint_ids;
+		std::vector<std::string> all_joint_names;
 		std::vector<std::string> active_joint_names;
+		std::vector<std::string> get_active_joint_names();
 		std::thread log_thread;
 		std::string LOG_PATH;
 		int LOG_BUFFER_SIZE;
@@ -88,7 +95,6 @@ class M4Base
 		void set_log_status(bool log_status);
 		void init_log();
 		void update_state();
-		RobotState get_state();
 		void clear_logs();
 		void log_status_loop();
 
@@ -102,15 +108,9 @@ class M4Base
 		std::thread control_thread;
 		void active_sleep(double sleep_time);
 
-		void execute_stand();
-		void execute_crouch();
-		void execute_sit();
-		void execute_uav();
-		void execute_mip();
-
 		std::vector<float> joint_position_cmd;
 		std::vector<int> joint_position_cmd_ids;
-		void execute_custom_joint_pos();
+		float movement_time;
 };
 
 #endif
