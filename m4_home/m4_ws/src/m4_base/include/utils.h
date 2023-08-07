@@ -15,7 +15,7 @@
 // Helper Functions
 bool IsSubset(std::vector<int> superset, std::vector<int> subset);
 double get_duration_secs(std::chrono::time_point<std::chrono::high_resolution_clock> t0, std::chrono::time_point<std::chrono::high_resolution_clock> t1);
-int twos_complement(int num);
+int twos_complement(int num, int numBytes);
 bool is_directory(const char* path);
 std::string datetime_to_str_seconds(const std::chrono::system_clock::time_point& tp);
 std::string getCurrentTimeAsString();

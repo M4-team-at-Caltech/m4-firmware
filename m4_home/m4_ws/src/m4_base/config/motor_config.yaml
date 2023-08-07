@@ -18,8 +18,8 @@ LEN_PRESENT_CURRENT: 2
 # Units multiplier
 # Multiply to convert to, divide to convert from given units
 MULT_SPEED: 1.374       # Multiply to convert from rotations per minute to degrees per second
-MULT_POSITION: 0.087891    # Multiply to convert from ticks to degrees
-MULT_CURRENT: 0.00269   # Multiply to convert from Dynamixel's unknown units to amps
+MULT_POSITION: 0.087891 # Multiply to convert from ticks to degrees
+MULT_CURRENT: 0.00269   # Multiply to convert from Dynamixel's unknown units to ma
 
 # Protocol version
 PROTOCOL_VERSION:  2.0  # See which protocol version is used in the Dynamixel

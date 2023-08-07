@@ -37,11 +37,8 @@ bool IsSubset(std::vector<int> superset, std::vector<int> subset)
     return std::includes(superset.begin(), superset.end(), subset.begin(), subset.end());
 }
 
-int twos_complement(int num)
+int twos_complement(int num, int numBytes)
 {
-	// Get the number of bytes of the integer (assuming it's either 2 or 4 bytes)
-    int numBytes = sizeof(num);
-
     // Mask to isolate the most significant bit for the given number of bytes
     int msbMask = 1 << ((numBytes * 8) - 1);
 
@@ -50,13 +47,14 @@ int twos_complement(int num)
 
     // Take the 2's complement only for negative numbers
     if (isNegative) 
-	{
+    {
         num = ~num; // Invert all the bits
         num += 1;      // Add 1
     }
 
     return num;
 }
+
 
 std::string datetime_to_str_seconds(const std::chrono::system_clock::time_point& tp)
 {

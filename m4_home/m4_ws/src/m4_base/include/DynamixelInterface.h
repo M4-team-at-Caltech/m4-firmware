@@ -60,6 +60,8 @@ class DynamixelPositionInterface
 		// Read feedback from servos
 		DynamixelStatus read_status();
 
+		JointConfig get_joint_config(int id);
+
 		// Command functions
 		int write_position(std::vector<int> ids, std::vector<float> positions);
 		int write_movement_speed(int id, float movement_speed);

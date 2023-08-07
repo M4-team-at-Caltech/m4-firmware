@@ -413,12 +413,27 @@ DynamixelStatus DynamixelPositionInterface::read_status()
 		 {
 			fprintf(stderr, "[ID:%03d] groupSyncRead getdata failed\n", active_joint_ids[i]);
 		 }
-		 status.position[i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION)) - joint_configs[active_joint_ids[i]].zero_tick);
-		 status.velocity[i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY));
-		 status.current[i] = MULT_CURRENT * twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT));
+
+		JointConfig joint_config = get_joint_config(active_joint_ids[i]);
+
+		status.position[i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION), LEN_PRESENT_POSITION) - joint_config.zero_tick);
+		status.velocity[i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY), LEN_PRESENT_VELOCITY);
+		status.current[i] = MULT_CURRENT * short(twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT), LEN_PRESENT_CURRENT));
 	}
 	
 	status.joint_names = active_joint_names;
 
 	return status;
+}
+
+JointConfig DynamixelPositionInterface::get_joint_config(int id)
+{
+	for(JointConfig joint : joint_configs)
+	{
+		if(joint.id == id)
+			return joint;
+	}
+
+
+	return JointConfig();
 }
