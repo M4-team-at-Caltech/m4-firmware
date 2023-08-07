@@ -10,6 +10,12 @@ int main(int argc, char *argv[])
 	m4.stand();
 	while(m4.get_current_configuration() != M4Configurations::STAND) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
+	m4.sit();
+	while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+	m4.stand();
+	while(m4.get_current_configuration() != M4Configurations::STAND) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
 	m4.crouch();
 	while(m4.get_current_configuration() != M4Configurations::CROUCH) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 

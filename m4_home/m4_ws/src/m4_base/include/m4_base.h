@@ -108,6 +108,13 @@ class M4Base
 		std::thread control_thread;
 		void active_sleep(double sleep_time);
 
+		void execute_stand(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
+		void execute_crouch(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
+		void execute_sit(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
+		void execute_uav(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
+		void execute_mip(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
+		void execute_custom(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
+
 		std::vector<float> joint_position_cmd;
 		std::vector<int> joint_position_cmd_ids;
 		float movement_time;

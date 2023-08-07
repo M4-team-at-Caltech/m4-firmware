@@ -56,9 +56,10 @@ class Logger
 				std::ofstream logfile(logpath + "/" + logname, std::ios_base::app);
 				for (int i=0; i < values.size(); i++)
 				{
-					for(int j = 0; j < values[i].size(); j++)
-						logfile << values[i][j] << ",";
-					logfile << "\b \n";
+					logfile << values[i][0];
+					for(int j = 1; j < values[i].size(); j++)
+						logfile << "," << values[i][j];
+					logfile << "\n";
 				}
 			}
 
