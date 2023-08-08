@@ -25,7 +25,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-catkin-tools\
     ros-$ROS_DISTRO-perception\
     ros-$ROS_DISTRO-realsense2-camera\
+    ros-${ROS_DISTRO}-mavros\
+    ros-${ROS_DISTRO}-mavros-extras\
+    ros-${ROS_DISTRO}-mavros-msgs\
     && rm -rf /var/lib/apt/lists/*
+
+# Install GeographicLib for mavros
+RUN wget https://raw.githubusercontent.com/mavlink/mavros/master/mavros/scripts/install_geographiclib_datasets.sh && bash ./install_geographiclib_datasets.sh
 
 # Set home directory - Mount this when running
 WORKDIR /home/m4
