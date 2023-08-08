@@ -1,0 +1,8 @@
+# Udev rules to set up USB devices
+# Copied to /etc/rules.d by set_udev_rules.sh
+#U2D2
+ACTION=="add", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", SYMLINK+="U2D2"
+ACTION=="add", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", RUN+="/opt/user_scripts/set_latency_timer.sh"
+
+#Pixhawk
+ACTION=="add", ATTRS{idVendor}=="2dae", ATTRS{idProduct}=="1016", SYMLINK+="pixhawk"
