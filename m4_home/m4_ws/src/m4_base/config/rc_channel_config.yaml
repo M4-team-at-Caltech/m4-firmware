@@ -1,0 +1,29 @@
+drive_mode:
+    channel_id: 7
+    stand: 1094
+    crouch: 1514
+    sit: 1934
+
+mip_mode:
+    channel_id: 8
+    drive: 1094
+    mip_transform: 1514
+    mip_ready: 1934 
+  
+uav_mode:
+    channel_id: 9
+    drive: 1094
+    uav_transform: 1514
+    uav_ready: 1934
+    
+x_velocity:
+    channel_id: 2
+    min: 1094
+    zero: 1514
+    max: 1934
+
+y_velocity:
+    channel_id: 1
+    min: 1094
+    zero: 1514
+    max: 1934

@@ -14,6 +14,8 @@ find_package(
 	catkin REQUIRED COMPONENTS
 	roscpp
 	m4_msgs
+	mavros_msgs
+	std_msgs
 	)
 
 ## System dependencies are found with CMake's conventions
@@ -111,7 +113,7 @@ add_definitions("-DPROJECT_ROOT_DIR=\"${PROJECT_SOURCE_DIR}\"")
 catkin_package(
   INCLUDE_DIRS include include/dynamixel_sdk third-party/yaml-cpp/include
   LIBRARIES DynamixelInterface
-  CATKIN_DEPENDS m4_msgs
+  CATKIN DEPENDS m4_msgs roscpp std_msgs mavros_msgs
 #   DEPENDS message_runtime
 )
 
@@ -196,10 +198,19 @@ add_executable(m4_base_test
 	unit-tests/m4_base_test.cpp
 )
 
+add_executable(m4_controller_node
+	nodes/m4_controller_node.cpp
+)
+
 # Link common libraries
 target_link_libraries(m4_base_test 
-	m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
-	${catkin_LIBRARIES}
+m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+${catkin_LIBRARIES}
+)
+
+target_link_libraries(m4_controller_node 
+m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+${catkin_LIBRARIES}
 )
 
 set(UNIT_TEST_SCRIPTS
