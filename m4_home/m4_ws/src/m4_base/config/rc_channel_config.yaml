@@ -11,10 +11,10 @@ mip_mode:
     mip_ready: 1934 
   
 uav_mode:
-    channel_id: 9
-    drive: 1094
+    channel_id: 10
+    drive: 1934
     uav_transform: 1514
-    uav_ready: 1934
+    uav_ready: 1094
     
 x_velocity:
     channel_id: 2
@@ -27,3 +27,9 @@ y_velocity:
     min: 1094
     zero: 1514
     max: 1934
+
+arming:
+    channel_id: 9
+    disarm: 1094
+    ground_mode_arm: 1514
+    aerial_mode_arm: 1934
