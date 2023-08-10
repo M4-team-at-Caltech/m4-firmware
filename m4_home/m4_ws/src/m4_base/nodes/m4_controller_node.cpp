@@ -195,7 +195,7 @@ void send_teensy_stop()
 {
 	if(teensy_running)
 	{
-		ROS_INFO("Sending teensy stop");
+		ROS_WARN("Sending teensy stop");
 		// TODO: Implement stop command to teensy, wait for ack
 		teensy_running = false;
 	}
@@ -254,7 +254,12 @@ int main(int argc, char **argv)
 					if(mip_channel_state == MIPMode::MODE_MIP_DISABLE && uav_channel_state == UAVMode::MODE_UAV_DISABLE)
 					{
 						current_mode = M4Mode::MODE_DRIVE;
-						teensy_control = true;
+						if(!teensy_control)
+						{
+							// TODO: Send message to teensy to take back control
+							ROS_WARN("Taking back teensy control\n");
+							teensy_control = true;
+						}
 						
 						// Make any required transformations
 						switch(drive_channel_state)
@@ -271,7 +276,7 @@ int main(int argc, char **argv)
 								{
 									send_teensy_stop();
 
-									ROS_INFO("Move to stand\n");
+									ROS_WARN("Move to stand\n");
 									current_configuration = M4Configurations::STAND;
 									// m4.stand();
 									// // Wait until it completes
@@ -299,7 +304,7 @@ int main(int argc, char **argv)
 										teensy_running = false;
 									}
 
-									ROS_INFO("Move to stand\n");
+									ROS_WARN("Move to stand\n");
 									current_configuration = M4Configurations::STAND;
 									// m4.stand();
 									// // Wait until it completes
@@ -311,7 +316,7 @@ int main(int argc, char **argv)
 								{
 									send_teensy_stop();
 
-									ROS_INFO("Move to crouch\n");
+									ROS_WARN("Move to crouch\n");
 									current_configuration = M4Configurations::CROUCH;
 									// m4.crouch();
 									// // Wait until it completes
@@ -334,7 +339,7 @@ int main(int argc, char **argv)
 								{
 									send_teensy_stop();
 
-									ROS_INFO("Move to stand\n");
+									ROS_WARN("Move to stand\n");
 									current_configuration = M4Configurations::STAND;
 									// m4.stand();
 									// // Wait until it completes
@@ -346,7 +351,7 @@ int main(int argc, char **argv)
 								{
 									send_teensy_stop();
 
-									ROS_INFO("Move to sit\n");
+									ROS_WARN("Move to sit\n");
 									current_configuration = M4Configurations::SIT;
 									// m4.sit();
 									// // Wait until it completes
@@ -367,7 +372,12 @@ int main(int argc, char **argv)
 					else if(mip_channel_state != MIPMode::MODE_MIP_DISABLE && (current_mode == M4Mode::MODE_DRIVE || current_mode == M4Mode::MODE_MIP))
 					{
 						current_mode = M4Mode::MODE_MIP;
-						teensy_control = true;
+						if(!teensy_control)
+						{
+							// TODO: Send message to teensy to take back control
+							ROS_WARN("Taking back teensy control\n");
+							teensy_control = true;
+						}
 						
 						// Make any transformations if needed
 						switch(mip_channel_state)
@@ -386,14 +396,14 @@ int main(int argc, char **argv)
 
 									if(current_configuration != M4Configurations::STAND)
 									{
-										ROS_INFO("Move to stand\n");
+										ROS_WARN("Move to stand\n");
 										current_configuration = M4Configurations::STAND;
 										// m4.stand();
 										// // Wait until it completes
 										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
 									}
 
-									ROS_INFO("Move to mip\n");
+									ROS_WARN("Move to mip\n");
 									current_configuration = M4Configurations::MIP;
 									// m4.mip();
 									// // Wait until it completes
@@ -410,14 +420,14 @@ int main(int argc, char **argv)
 
 									if(current_configuration != M4Configurations::STAND)
 									{
-										ROS_INFO("Move to stand\n");
+										ROS_WARN("Move to stand\n");
 										current_configuration = M4Configurations::STAND;
 										// m4.stand();
 										// // Wait until it completes
 										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
 									}
 
-									ROS_INFO("Move to mip\n");
+									ROS_WARN("Move to mip\n");
 									current_configuration = M4Configurations::MIP;
 									// m4.mip();
 									// // Wait until it completes
@@ -454,7 +464,8 @@ int main(int argc, char **argv)
 									send_teensy_stop();
 									if(!teensy_control)
 									{
-										// TODO: Tell teensy to take control, wait for ack
+										// TODO: Send message to teensy to take back control
+										ROS_WARN("Taking back teensy control\n");
 										teensy_control = true;
 									}
 
@@ -466,20 +477,21 @@ int main(int argc, char **argv)
 									send_teensy_stop();
 									if(!teensy_control)
 									{
-										// TODO: Tell teensy to take control, wait for ack
+										// TODO: Send message to teensy to take back control
+										ROS_WARN("Taking back teensy control\n");
 										teensy_control = true;
 									}
 
 									if(current_configuration != M4Configurations::STAND)
 									{
-										ROS_INFO("Move to stand\n");
+										ROS_WARN("Move to stand\n");
 										current_configuration = M4Configurations::STAND;
 										// m4.stand();
 										// // Wait until it completes
 										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
 									}
 
-									ROS_INFO("Move to uav\n");
+									ROS_WARN("Move to uav\n");
 									current_configuration = M4Configurations::UAV;
 									// m4.uav();
 									// // Wait until it completes
@@ -496,14 +508,14 @@ int main(int argc, char **argv)
 
 									if(current_configuration != M4Configurations::STAND)
 									{
-										ROS_INFO("Move to stand\n");
+										ROS_WARN("Move to stand\n");
 										current_configuration = M4Configurations::STAND;
 										// m4.stand();
 										// // Wait until it completes
 										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
 									}
 
-									ROS_INFO("Move to uav\n");
+									ROS_WARN("Move to uav\n");
 									current_configuration = M4Configurations::UAV;
 									// m4.uav();
 									// // Wait until it completes
@@ -513,12 +525,15 @@ int main(int argc, char **argv)
 								if(teensy_control)
 								{
 									// TODO: Tell teensy to switch control to pixhawk, wait for ack
-									ROS_INFO_ONCE("Switching control to pixhawk");
+									ROS_WARN("Switching control to pixhawk\n");
 									teensy_control = false;
 								}
 
 								break;		
 						}
+
+						if(!teensy_control)
+							ROS_INFO("Pixhawk in control!");
 					}
 			}
 			
