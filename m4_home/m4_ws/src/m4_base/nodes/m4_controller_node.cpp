@@ -6,6 +6,7 @@
 #include <mavros_msgs/RCIn.h>
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/OverrideRCIn.h>
+#include <mavros_msgs/CommandBool.h>
 #include "m4_base.h"
 
 struct DriveConfig
@@ -214,7 +215,11 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "m4_controller_node", ros::init_options::AnonymousName);
 	ros::NodeHandle nh;
 
-	ros::Subscriber sub = nh.subscribe("/mavros/rc/in", 1, rc_subscriber_callback);
+	ros::Subscriber rc_sub = nh.subscribe("/mavros/rc/in", 1, rc_subscriber_callback);
+	ros::Subscriber pixhawk_state_sub = nh.subscribe("/mavros/state", 1, pixhawk_state_subscriber_callback);
+	ros::ServiceClient arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
+	ros::Publisher rc_override_pub = nh.advertise<mavros_msgs::OverrideRCIn>("/mavros/rc/override", 1);
+	ros::Time last_request = ros::Time::now();
 
 	std::vector<int> active_joint_ids = {1, 2, 3, 4};
 	// M4Base m4(active_joint_ids, true);
@@ -535,6 +540,35 @@ int main(int argc, char **argv)
 						if(!teensy_control)
 							ROS_INFO("Pixhawk in control!");
 					}
+			
+					break;
+
+				// If armed for aerial mode
+				case ArmMode::MODE_AERIAL_ARM:
+					// M4Configurations current_configuration = m4.get_current_configuration();
+
+					// Do nothing if armed
+					if(pixhawk_state.armed)
+					{
+						ROS_DEBUG("Armed. Do nothing.");
+						break;
+					}
+
+					// Override arm command if not in UAV mode and ready (teensy handed control back to pixhawk)
+					if((current_configuration != M4Configurations::UAV) || (uav_channel_state != UAVMode::MODE_UAV_READY))
+					{
+						ROS_ERROR("Not in UAV READY MODE. Disarming!");
+						mavros_msgs::CommandBool arm_cmd;
+						arm_cmd.request.value = false;
+						if(arming_client.call(arm_cmd) && arm_cmd.response.success)
+						{
+							ROS_INFO("Vehicle disarmed\n");
+						}
+						last_request = ros::Time::now();
+					}
+
+					break;
+
 			}
 			
 		}	
