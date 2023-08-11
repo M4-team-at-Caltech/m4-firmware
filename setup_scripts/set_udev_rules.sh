@@ -1,9 +1,11 @@
 #!/bin/bash
 
 # Copy rules file to location
-cp ./10-local.rules /etc/rules.d
+cp ./10-local.rules /etc/udev/rules.d/
+
 # Activate the rules
-udevadm control --reload
+chmod 644 /etc/udev/rules.d/10-local.rules
+udevadm control --reload-rules
 udevadm trigger
 
 # Copy latency timer script to location

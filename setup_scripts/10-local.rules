@@ -1,5 +1,8 @@
 # Udev rules to set up USB devices
 # Copied to /etc/rules.d by set_udev_rules.sh
+# Teensy
+ACTION=="add", ATTRS{idVendor}=="16c0", ATTRS{idProduct}=="0483", ATTRS{serial}=="13475820", SYMLINK+="teensy"
+
 #U2D2
 ACTION=="add", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", SYMLINK+="U2D2"
 ACTION=="add", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", RUN+="/opt/user_scripts/set_latency_timer.sh"

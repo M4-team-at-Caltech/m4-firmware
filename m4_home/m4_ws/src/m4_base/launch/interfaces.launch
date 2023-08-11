@@ -1,0 +1,9 @@
+<launch>
+	<include file="$(find mavros)/launch/px4.launch">
+		<arg name="fcu_url" value="/dev/pixhawk:921600"/>
+	</include>
+
+	<node pkg="rosserial_python" type="serial_node.py" name="serial_node" output="screen">
+    	<param name="port" value="/dev/teensy"/>
+  	</node>
+</launch>

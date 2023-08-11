@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-mavros\
     ros-${ROS_DISTRO}-mavros-extras\
     ros-${ROS_DISTRO}-mavros-msgs\
+    ros-${ROS_DISTRO}-rosserial\
     && rm -rf /var/lib/apt/lists/*
 
 # Install GeographicLib for mavros

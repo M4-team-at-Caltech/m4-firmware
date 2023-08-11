@@ -7,6 +7,9 @@
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/OverrideRCIn.h>
 #include <mavros_msgs/CommandBool.h>
+#include <std_msgs/UInt8.h>
+#include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Vector3.h>
 #include "m4_base.h"
 
 struct DriveConfig
@@ -192,20 +195,35 @@ void init_configs(std::string config_path)
 	teensy_control = true;
 }
 
-void send_teensy_stop()
+void send_teensy_stop(ros::Publisher &teensy_cmd_pub)
 {
 	if(teensy_running)
 	{
 		ROS_WARN("Sending teensy stop");
-		// TODO: Implement stop command to teensy, wait for ack
+		std_msgs::UInt8 cmd_msg;
+		cmd_msg.data = 0;
+		teensy_cmd_pub.publish(cmd_msg);
 		teensy_running = false;
 	}
 }
 
-void send_teensy_vel()
+void send_teensy_vel(ros::Publisher &teensy_vel_pub)
 {
 	ROS_INFO("Sending teensy velocities");
-	// TODO: Implement velocity sending to teensy
+	geometry_msgs::Twist twist_msg;
+	geometry_msgs::Vector3 linear;
+	geometry_msgs::Vector3 angular;
+
+	linear.x = xvel_state;
+	linear.y = 0;
+	linear.z = 0;
+	angular.z = yvel_state;
+	angular.y = 0;
+	angular.x = 0;
+
+	twist_msg.linear = linear;
+	twist_msg.angular = angular;
+	teensy_vel_pub.publish(twist_msg);
 }
 
 int main(int argc, char **argv)
@@ -219,7 +237,9 @@ int main(int argc, char **argv)
 	ros::Subscriber pixhawk_state_sub = nh.subscribe("/mavros/state", 1, pixhawk_state_subscriber_callback);
 	ros::ServiceClient arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
 	ros::Publisher rc_override_pub = nh.advertise<mavros_msgs::OverrideRCIn>("/mavros/rc/override", 1);
-	ros::Time last_request = ros::Time::now();
+	ros::Publisher teensy_vel_pub = nh.advertise<geometry_msgs::Twist>("/robot/twist_command", 10);
+	ros::Publisher teensy_cmd_pub = nh.advertise<std_msgs::UInt8>("/teensy/cmd_code", 10);
+
 
 	std::vector<int> active_joint_ids = {1, 2, 3, 4};
 	// M4Base m4(active_joint_ids, true);
@@ -232,6 +252,7 @@ int main(int argc, char **argv)
 	{
 		if(rc_state_available)
 		{
+			ROS_WARN_ONCE("M4 Controller Active!");
 			// printf("DC: %d\tMC: %d\tUC: %d\tAC: %d\tXV: %.2f\tYV: %.2f\r", 
 			// drive_channel_state,
 			// mip_channel_state,
@@ -248,7 +269,7 @@ int main(int argc, char **argv)
 			{
 				// If disarmed do nothing
 				case ArmMode::MODE_DISARM:
-					send_teensy_stop();
+					send_teensy_stop(teensy_cmd_pub);
 					break;
 
 				// If armed for ground mode
@@ -262,7 +283,7 @@ int main(int argc, char **argv)
 						if(!teensy_control)
 						{
 							// TODO: Send message to teensy to take back control
-							ROS_WARN("Taking back teensy control\n");
+							ROS_WARN("Taking back teensy control");
 							teensy_control = true;
 						}
 						
@@ -279,9 +300,9 @@ int main(int argc, char **argv)
 
 								else // Move to stand configuration
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 
-									ROS_WARN("Move to stand\n");
+									ROS_WARN("Move to stand");
 									current_configuration = M4Configurations::STAND;
 									// m4.stand();
 									// // Wait until it completes
@@ -309,7 +330,7 @@ int main(int argc, char **argv)
 										teensy_running = false;
 									}
 
-									ROS_WARN("Move to stand\n");
+									ROS_WARN("Move to stand");
 									current_configuration = M4Configurations::STAND;
 									// m4.stand();
 									// // Wait until it completes
@@ -319,9 +340,9 @@ int main(int argc, char **argv)
 
 								else // Move to crouch configuration
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 
-									ROS_WARN("Move to crouch\n");
+									ROS_WARN("Move to crouch");
 									current_configuration = M4Configurations::CROUCH;
 									// m4.crouch();
 									// // Wait until it completes
@@ -342,9 +363,9 @@ int main(int argc, char **argv)
 								// If in UAV or MIP configurations move to stand first
 								else if(current_configuration == M4Configurations::MIP || current_configuration == M4Configurations::UAV)
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 
-									ROS_WARN("Move to stand\n");
+									ROS_WARN("Move to stand");
 									current_configuration = M4Configurations::STAND;
 									// m4.stand();
 									// // Wait until it completes
@@ -354,9 +375,9 @@ int main(int argc, char **argv)
 
 								else // Move to sit configuration
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 
-									ROS_WARN("Move to sit\n");
+									ROS_WARN("Move to sit");
 									current_configuration = M4Configurations::SIT;
 									// m4.sit();
 									// // Wait until it completes
@@ -369,7 +390,7 @@ int main(int argc, char **argv)
 
 						if(teensy_running)
 						{
-							send_teensy_vel();
+							send_teensy_vel(teensy_vel_pub);
 						}
 					}
 
@@ -380,7 +401,7 @@ int main(int argc, char **argv)
 						if(!teensy_control)
 						{
 							// TODO: Send message to teensy to take back control
-							ROS_WARN("Taking back teensy control\n");
+							ROS_WARN("Taking back teensy control");
 							teensy_control = true;
 						}
 						
@@ -391,24 +412,24 @@ int main(int argc, char **argv)
 								// Do nothing if already in mip configuration
 								if(current_configuration == M4Configurations::MIP)
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 									break;
 								}
 
 								else // Move to mip configuration
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 
 									if(current_configuration != M4Configurations::STAND)
 									{
-										ROS_WARN("Move to stand\n");
+										ROS_WARN("Move to stand");
 										current_configuration = M4Configurations::STAND;
 										// m4.stand();
 										// // Wait until it completes
 										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
 									}
 
-									ROS_WARN("Move to mip\n");
+									ROS_WARN("Move to mip");
 									current_configuration = M4Configurations::MIP;
 									// m4.mip();
 									// // Wait until it completes
@@ -421,18 +442,18 @@ int main(int argc, char **argv)
 								// Move to MIP configuration if not already in it
 								if(current_configuration != M4Configurations::MIP)
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 
 									if(current_configuration != M4Configurations::STAND)
 									{
-										ROS_WARN("Move to stand\n");
+										ROS_WARN("Move to stand");
 										current_configuration = M4Configurations::STAND;
 										// m4.stand();
 										// // Wait until it completes
 										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
 									}
 
-									ROS_WARN("Move to mip\n");
+									ROS_WARN("Move to mip");
 									current_configuration = M4Configurations::MIP;
 									// m4.mip();
 									// // Wait until it completes
@@ -450,7 +471,7 @@ int main(int argc, char **argv)
 
 						if(teensy_running)
 						{
-							send_teensy_vel();
+							send_teensy_vel(teensy_vel_pub);
 						}
 					}
 			
@@ -466,7 +487,7 @@ int main(int argc, char **argv)
 								// Do nothing if already in uav configuration
 								if(current_configuration == M4Configurations::UAV)
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 									if(!teensy_control)
 									{
 										// TODO: Send message to teensy to take back control
@@ -479,7 +500,7 @@ int main(int argc, char **argv)
 
 								else // Move to uav configuration
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 									if(!teensy_control)
 									{
 										// TODO: Send message to teensy to take back control
@@ -509,7 +530,7 @@ int main(int argc, char **argv)
 								// Move to MIP configuration if not already in it
 								if(current_configuration != M4Configurations::UAV)
 								{
-									send_teensy_stop();
+									send_teensy_stop(teensy_cmd_pub);
 
 									if(current_configuration != M4Configurations::STAND)
 									{
@@ -564,7 +585,6 @@ int main(int argc, char **argv)
 						{
 							ROS_INFO("Vehicle disarmed\n");
 						}
-						last_request = ros::Time::now();
 					}
 
 					break;

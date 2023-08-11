@@ -16,6 +16,7 @@ find_package(
 	m4_msgs
 	mavros_msgs
 	std_msgs
+	geometry_msgs
 	)
 
 ## System dependencies are found with CMake's conventions
@@ -113,7 +114,7 @@ add_definitions("-DPROJECT_ROOT_DIR=\"${PROJECT_SOURCE_DIR}\"")
 catkin_package(
   INCLUDE_DIRS include include/dynamixel_sdk third-party/yaml-cpp/include
   LIBRARIES DynamixelInterface
-  CATKIN DEPENDS m4_msgs roscpp std_msgs mavros_msgs
+  CATKIN DEPENDS m4_msgs roscpp std_msgs mavros_msgs geometry_msgs
 #   DEPENDS message_runtime
 )
 
