@@ -65,6 +65,10 @@ class RotorInterface {
         multiplexer.ground_signals(1);    
     }
 
+    void set_signal_source(RotorSignalSource source) {
+        multiplexer.select_channel(uint8_t(source));
+    }
+
     void set_dutycycle(uint16_t fr_pwm, uint16_t rr_pwm, uint16_t rl_pwm, uint16_t fl_pwm) {
         // rotors[FR].writeMicroseconds(fr_pwm);
         // rotors[RR].writeMicroseconds(rr_pwm);
@@ -74,10 +78,6 @@ class RotorInterface {
         rotors[RR].set_dutycycle(rr_pwm);
         rotors[RL].set_dutycycle(rl_pwm);
         rotors[FL].set_dutycycle(fl_pwm);
-    }
-
-    void set_signal_source(RotorSignalSource source) {
-        multiplexer.select_channel(uint8_t(source));
     }
 };
 

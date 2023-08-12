@@ -1,4 +1,4 @@
-/** UTILITIES -------------------------------------------------------------- */
+/** UTILITIES ============================================================== */
     /* INDEX MAP */
 #define FR 0
 #define RR 1
@@ -11,6 +11,13 @@
 #define PIN_RR(NAME) PIN_REAR_RIGHT_##NAME
 #define PIN_RL(NAME) PIN_REAR_LEFT_##NAME
 #define PIN_FL(NAME) PIN_FRONT_LEFT_##NAME
+
+/** TEENSY PIN ALLOCATION ================================================== */
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 13
+#endif//LED_BUILTIN
+
+#define REBOOT_PIN  0
 
 /** ROTORS ----------------------------------------------------------------- */
     /* MULTIPLEXER */
