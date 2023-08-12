@@ -39,10 +39,11 @@ void DroneController::test(int id) {
 }
 
 
-void DroneController::init(void) {}
+void DroneController::init(void) {
+    RotorInterface::set_signal_source(RotorSignalSource::CUBE_ORANGE);
+    RotorInterface::enable_rotors();
+}
 
 void DroneController::update(void) {
     return; // PX4 Autopilot is in charge
 }
-
-void DroneController::exit(void) {}

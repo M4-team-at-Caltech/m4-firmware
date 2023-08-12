@@ -43,7 +43,9 @@ void RoverController::test(int id) {
 }
 
 
-void RoverController::init(void) {}
+void RoverController::init(void) {
+    WheelInterface::enable_motors();
+}
 
 void RoverController::update(float lin_vel, float ang_vel) {
     float cmd_r = lin_vel - TURNING_GAIN * ang_vel;
@@ -51,7 +53,5 @@ void RoverController::update(float lin_vel, float ang_vel) {
     
     set_unit_speed(cmd_r, cmd_r, cmd_l, cmd_l);
 }
-
-void RoverController::exit(void) {}
 
 

@@ -1,0 +1,14 @@
+enum class Command {
+    POSE_RECEIVED,
+    TWIST_ACK,
+
+    TRANSFORM_ROVER, 
+    DRIVE,
+    TRANSFORM_DRONE, 
+    FLY,
+    TRANSFORM_SEGWAY,
+    BALANCE,
+
+    STOP,
+    NOT_IMPLEMENTED,
+};

@@ -29,7 +29,6 @@ struct Wheel : public WheelMotorController, public WheelMotorEncoder {
     }
 
     using WheelMotorController::brake;
-    using WheelMotorController::stop;
 
     // using WheelMotorEncoder::get_position; //todo implement
     // using WheelMotorEncoder::get_speed; //todo implement
@@ -40,10 +39,6 @@ struct Wheel : public WheelMotorController, public WheelMotorEncoder {
 
 class WheelInterface {
     std::array<Wheel, N_LEGS> wheels;
-
-    void init()  {}
-    void run()  {}
-    void stop()  {}
 
   public:
     WheelInterface(void)
@@ -60,16 +55,15 @@ class WheelInterface {
         // wheels[FL].detach();
     }
 
-    void enable_rotors(void) {
-        for(auto& wheel : wheels) wheel.stop(1);
+    void enable_motors(void) {
         // wheels[FR].stop(1);
         // wheels[RR].stop(1);
         // wheels[RL].stop(1);
         // wheels[FL].stop(1);
     }
 
-    void disable_rotors(void) {
-        for(auto& wheel : wheels) wheel.stop(0);
+    void disable_motors(void) {
+        set_unit_speed(0, 0, 0, 0);
         // wheels[FR].stop(0);
         // wheels[RR].stop(0);
         // wheels[RL].stop(0);

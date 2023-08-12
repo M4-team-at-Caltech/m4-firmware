@@ -9,7 +9,6 @@ class RoverController: public virtual WheelInterface {
 
     void init(void);
     void update(float lin_vel, float ang_vel);
-    void exit(void);
 };
 
 #endif//ROVER_CONTROLLER
