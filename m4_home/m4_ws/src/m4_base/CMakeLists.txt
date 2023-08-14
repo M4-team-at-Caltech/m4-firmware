@@ -160,6 +160,9 @@ add_library(m4_base STATIC
 add_library(dynamixel_sdk STATIC
 	src/dynamixel_sdk/group_bulk_read.cpp
 	src/dynamixel_sdk/group_bulk_write.cpp
+	src/dynamixel_sdk/group_fast_bulk_read.cpp
+	src/dynamixel_sdk/group_fast_sync_read.cpp
+	src/dynamixel_sdk/group_handler.cpp
 	src/dynamixel_sdk/group_sync_read.cpp
 	src/dynamixel_sdk/group_sync_write.cpp
 	src/dynamixel_sdk/packet_handler.cpp
@@ -173,6 +176,9 @@ add_library(dynamixel_sdk STATIC
 	include/dynamixel_sdk/dynamixel_sdk.h
 	include/dynamixel_sdk/group_bulk_read.h
 	include/dynamixel_sdk/group_bulk_write.h
+	include/dynamixel_sdk/group_fast_bulk_read.h
+	include/dynamixel_sdk/group_fast_sync_read.h
+	include/dynamixel_sdk/group_handler.h
 	include/dynamixel_sdk/group_sync_read.h
 	include/dynamixel_sdk/group_sync_write.h
 	include/dynamixel_sdk/packet_handler.h
