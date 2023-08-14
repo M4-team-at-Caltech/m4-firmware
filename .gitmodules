@@ -1,3 +1,6 @@
 [submodule "m4_home/m4_ws/src/dynamixel_interface/third-party/yaml-cpp"]
 	path = m4_home/m4_ws/src/m4_base/third-party/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "m4_home/m4_ws/src/m4_base/third-party/DynamixelSDK"]
+	path = m4_home/m4_ws/src/m4_base/third-party/DynamixelSDK
+	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
