@@ -25,6 +25,8 @@ find_package(
 # Set project root directory
 add_definitions("-DPROJECT_ROOT_DIR=\"${PROJECT_SOURCE_DIR}\"")
 
+# Modify the latency timer in dynamixel_sdk. (Value used in src/dynamixel_sdk/port_handler_linux.cpp)
+add_definitions("-DLATENCY_TIMER=1")
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
