@@ -104,7 +104,7 @@ void M4Base::control_loop()
 		t1 = std::chrono::system_clock::now();
 		dt = get_duration_secs(t0, t1);
 		sleep_for = (1.0/CONTROL_LOOP_RATE - dt) * 1.0e3;
-		if(sleep_for > 0)
+		if(sleep_for < 0)
 			sleep_for += 1.0e3/CONTROL_LOOP_RATE;
 		std::this_thread::sleep_for(std::chrono::milliseconds(int(sleep_for)));	
 		t0 = t1;
@@ -150,7 +150,7 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_position(active_joint_ids, crouch_configuration);
+				dxl.write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
@@ -242,13 +242,13 @@ void M4Base::execute_uav(int& command_step, bool& command_active, std::chrono::_
 		if(command_step == 0)
 		{
 			command_step = 1;
-			dxl.write_position(active_joint_ids, crouch_configuration);
+			dxl.write_position(active_joint_ids, sit_configuration);
 			gait_start = std::chrono::system_clock::now();
 			command_active = true;
 		}
 
 		// Step 2: Move to UAV position
-		if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+		if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 5 && command_step == 1)
 		{
 			command_step = 2;
 			dxl.write_position(active_joint_ids, uav_configuration);
@@ -279,13 +279,13 @@ void M4Base::execute_mip(int& command_step, bool& command_active, std::chrono::_
 		if(command_step == 0)
 		{
 			command_step = 1;
-			dxl.write_position(active_joint_ids, crouch_configuration);
+			dxl.write_position(active_joint_ids, sit_configuration);
 			gait_start = std::chrono::system_clock::now();
 			command_active = true;
 		}
 
 		// Step 2: Move to UAV position
-		if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+		if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 5 && command_step == 1)
 		{
 			command_step = 2;
 			dxl.write_position(active_joint_ids, mip_configuration);

@@ -138,7 +138,7 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	read_start_address =  ADDR_PRESENT_CURRENT;
 	bool dxl_addparam_result = false;
 
-	groupSyncRead = new dynamixel::GroupSyncRead(portHandler, packetHandler, read_start_address, read_data_length);
+	groupSyncRead = new dynamixel::GroupFastSyncRead(portHandler, packetHandler, read_start_address, read_data_length);
 
 	// Add other motors read
 	for(int i = 0; i < active_joint_ids.size(); i++)
@@ -292,7 +292,7 @@ int DynamixelPositionInterface::write_position(std::vector<int> ids, std::vector
 			positions[i] = jconfig.max_tick;
 		}
 		
-		//printf("[INFO]: Writing position %d=%f deg to joint %s\n", int(positions[i]), (positions[i] - jconfig.zero_tick)*MULT_POSITION, jconfig.name.c_str());
+		// printf("[INFO]: Writing position %d=%f deg to joint %s\n", int(positions[i]), (positions[i] - jconfig.zero_tick)*MULT_POSITION, jconfig.name.c_str());
 	}
 
 	int dxl_error = 0;
@@ -403,7 +403,6 @@ DynamixelStatus DynamixelPositionInterface::read_status()
 			printf("[ID:%03d] %s\n", active_joint_ids[i], packetHandler->getRxPacketError(dxl_error));
 		}
 	}
-
 
 	// Save data from buffer
 	for(int i = 0; i < active_joint_ids.size(); i++)
