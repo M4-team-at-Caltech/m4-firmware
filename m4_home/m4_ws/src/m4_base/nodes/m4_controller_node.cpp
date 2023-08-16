@@ -241,8 +241,8 @@ int main(int argc, char **argv)
 	ros::Publisher teensy_cmd_pub = nh.advertise<std_msgs::UInt8>("/teensy/cmd_code", 10);
 
 
-	std::vector<int> active_joint_ids = {1, 2, 3, 4};
-	// M4Base m4(active_joint_ids, true);
+	std::vector<int> active_joint_ids = {1, 2, 3, 4, 5, 6, 7, 8};
+	M4Base m4(active_joint_ids, false);
 
 	ros::Rate loop_rate(200);
 
@@ -274,7 +274,7 @@ int main(int argc, char **argv)
 
 				// If armed for ground mode
 				case ArmMode::MODE_GROUND_ARM:
-					// M4Configurations current_configuration = m4.get_current_configuration();
+					current_configuration = m4.get_current_configuration();
 
 					// Check for drive mode
 					if(mip_channel_state == MIPMode::MODE_MIP_DISABLE && uav_channel_state == UAVMode::MODE_UAV_DISABLE)
@@ -303,10 +303,7 @@ int main(int argc, char **argv)
 									send_teensy_stop(teensy_cmd_pub);
 
 									ROS_WARN("Move to stand");
-									current_configuration = M4Configurations::STAND;
-									// m4.stand();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
+									m4.stand();
 									teensy_running = true;
 								}
 
@@ -320,33 +317,12 @@ int main(int argc, char **argv)
 									break;
 								}
 
-								// If in UAV or MIP configurations move to stand first
-								else if(current_configuration == M4Configurations::MIP || current_configuration == M4Configurations::UAV)
-								{
-
-									if(teensy_running)
-									{
-										// TODO: Implement code to stop teensy, wait for ack, set teensy running to false.
-										teensy_running = false;
-									}
-
-									ROS_WARN("Move to stand");
-									current_configuration = M4Configurations::STAND;
-									// m4.stand();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
-									teensy_running = true;
-								}
-
 								else // Move to crouch configuration
 								{
 									send_teensy_stop(teensy_cmd_pub);
 
 									ROS_WARN("Move to crouch");
-									current_configuration = M4Configurations::CROUCH;
-									// m4.crouch();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::CROUCH){loop_rate.sleep(); ros::spinOnce();}
+									m4.crouch();
 									teensy_running = true;
 								}				
 
@@ -360,28 +336,12 @@ int main(int argc, char **argv)
 									break;
 								}
 
-								// If in UAV or MIP configurations move to stand first
-								else if(current_configuration == M4Configurations::MIP || current_configuration == M4Configurations::UAV)
-								{
-									send_teensy_stop(teensy_cmd_pub);
-
-									ROS_WARN("Move to stand");
-									current_configuration = M4Configurations::STAND;
-									// m4.stand();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
-									teensy_running = true;
-								}
-
 								else // Move to sit configuration
 								{
 									send_teensy_stop(teensy_cmd_pub);
 
 									ROS_WARN("Move to sit");
-									current_configuration = M4Configurations::SIT;
-									// m4.sit();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::SIT){loop_rate.sleep(); ros::spinOnce();}
+									m4.sit();
 									teensy_running = true;
 								}
 
@@ -420,20 +380,8 @@ int main(int argc, char **argv)
 								{
 									send_teensy_stop(teensy_cmd_pub);
 
-									if(current_configuration != M4Configurations::STAND)
-									{
-										ROS_WARN("Move to stand");
-										current_configuration = M4Configurations::STAND;
-										// m4.stand();
-										// // Wait until it completes
-										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
-									}
-
 									ROS_WARN("Move to mip");
-									current_configuration = M4Configurations::MIP;
-									// m4.mip();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::MIP){loop_rate.sleep(); ros::spinOnce();}
+									m4.mip();
 								}
 
 								break;
@@ -444,20 +392,8 @@ int main(int argc, char **argv)
 								{
 									send_teensy_stop(teensy_cmd_pub);
 
-									if(current_configuration != M4Configurations::STAND)
-									{
-										ROS_WARN("Move to stand");
-										current_configuration = M4Configurations::STAND;
-										// m4.stand();
-										// // Wait until it completes
-										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
-									}
-
 									ROS_WARN("Move to mip");
-									current_configuration = M4Configurations::MIP;
-									// m4.mip();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::MIP){loop_rate.sleep(); ros::spinOnce();}	
+									m4.mip();
 								}
 								
 								if(!teensy_running)
@@ -508,20 +444,8 @@ int main(int argc, char **argv)
 										teensy_control = true;
 									}
 
-									if(current_configuration != M4Configurations::STAND)
-									{
-										ROS_WARN("Move to stand\n");
-										current_configuration = M4Configurations::STAND;
-										// m4.stand();
-										// // Wait until it completes
-										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
-									}
-
 									ROS_WARN("Move to uav\n");
-									current_configuration = M4Configurations::UAV;
-									// m4.uav();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::UAV){loop_rate.sleep(); ros::spinOnce();}
+									m4.uav();
 								}
 
 								break;
@@ -532,20 +456,8 @@ int main(int argc, char **argv)
 								{
 									send_teensy_stop(teensy_cmd_pub);
 
-									if(current_configuration != M4Configurations::STAND)
-									{
-										ROS_WARN("Move to stand\n");
-										current_configuration = M4Configurations::STAND;
-										// m4.stand();
-										// // Wait until it completes
-										// while(!m4.get_current_configuration() == M4Configurations::STAND){loop_rate.sleep(); ros::spinOnce();}
-									}
-
 									ROS_WARN("Move to uav\n");
-									current_configuration = M4Configurations::UAV;
-									// m4.uav();
-									// // Wait until it completes
-									// while(!m4.get_current_configuration() == M4Configurations::UAV){loop_rate.sleep(); ros::spinOnce();}	
+									m4.uav();
 								}
 								
 								if(teensy_control)
@@ -566,7 +478,7 @@ int main(int argc, char **argv)
 
 				// If armed for aerial mode
 				case ArmMode::MODE_AERIAL_ARM:
-					// M4Configurations current_configuration = m4.get_current_configuration();
+					current_configuration = m4.get_current_configuration();
 
 					// Do nothing if armed
 					if(pixhawk_state.armed)
