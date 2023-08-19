@@ -4,8 +4,8 @@
 ACTION=="add", ATTRS{idVendor}=="16c0", ATTRS{idProduct}=="0483", ATTRS{serial}=="13475820", SYMLINK+="teensy"
 
 #U2D2
-ACTION=="add", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", SYMLINK+="U2D2"
-ACTION=="add", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", RUN+="/opt/user_scripts/set_latency_timer.sh"
+SUBSYSTEM=="tty", ATTRS{serial}=="FT7WBNOY", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", SYMLINK+="U2D2"
+ACTION=="add", SUBSYSTEM=="usb-serial", DRIVER=="ftdi_sio", ATTR{latency_timer}="1"
 
 #Pixhawk
 ACTION=="add", ATTRS{idVendor}=="2dae", ATTRS{idProduct}=="1016", SYMLINK+="pixhawk"

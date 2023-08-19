@@ -31,19 +31,24 @@ void send_command_looped(DynamixelPositionInterface *dxl,vector<int> id_list)
 
 	while (!stopFlag)
 	{
-		// List of dynamixel IDs to actuate for this test
-		vector<float> goal_positions1 = {0, 60, 0, 60}; 
+		// List of dynamixel IDs to actuate for this test 
+		
+		// FL
+		vector<float> goal_positions1 = {0, 90, 0, 90}; 
 		dxl->write_position(id_list, goal_positions1);
-		std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-		vector<float> goal_positions2 = {90, 60, 90, 60}; 
+		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+		vector<float> goal_positions2 = {90, 45, 90, 45}; 
 		dxl->write_position(id_list, goal_positions2);
 		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-		vector<float> goal_positions3 = {0, 60, 0, 60}; 
+		//backward		
+		dxl->write_position(id_list, goal_positions2);
+		std::this_thread::sleep_for(std::chrono::milliseconds(5000));		
+		dxl->write_position(id_list, goal_positions1);
+		std::this_thread::sleep_for(std::chrono::milliseconds(5000));		
+		vector<float> goal_positions3 = {0, 0, 0, 0}; 
 		dxl->write_position(id_list, goal_positions3);
 		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-		vector<float> goal_positions4 = {0, 0, 0, 0}; 
-		dxl->write_position(id_list, goal_positions4);
-		std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
     }
 }
 
@@ -52,7 +57,7 @@ int main(int argc, char *argv[])
 	// Port and baudrate to connect to dynamixel
 	// Verify that the port name is correct. This can be different on your system
 	// Baudrate is set using the Dynamixel Wizard on the Dynamixel Servo directly
-	const char* port = string("/dev/ttyUSB0").c_str();
+	const char* port = string("/dev/U2D2").c_str();
 	int baudrate = 115200;
 	vector<int> id_list = {1, 2, 3, 4};	
 	
