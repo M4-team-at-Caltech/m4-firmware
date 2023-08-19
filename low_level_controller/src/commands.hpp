@@ -8,7 +8,8 @@ enum class Command {
     FLY,
     TRANSFORM_SEGWAY,
     BALANCE,
-
     STOP,
+
+    KILL_ALL,
     NOT_IMPLEMENTED,
 };

@@ -1,22 +1,19 @@
 #ifndef ROTOR_INTERFACE
 #define ROTOR_INTERFACE
 
-#include <Servo.h>
+#include <Arduino.h>
 #include <array>
 
-#include "hardware/MultiplexerQuad2To1_CD74AC157E.hpp"
-#include "hardware/SpeedControllerBLDC_.hpp"
-#include "definitions.hpp"
+#include "hardware/component/MultiplexerQuad2To1_CD74AC157E.hpp"
+#include "hardware/component/BldcSpeedController_120F3X.hpp"
+#include "hardware/assembly/teensy_pin_allocation.hpp"
 
-using RotorMotorController = SpeedControllerBLDC_;
+using RotorMotorController = BldcSpeedController_120F3X;
 using RotorSignalSelector = MultiplexerQuad2To1_CD74AC157E;
 
 struct Rotor : public RotorMotorController {
-
     Rotor(std::vector<uint8_t> controller_pins)
-    : RotorMotorController{controller_pins} {
-        // for(auto& pin : controller_pins) pinMode(pin, OUTPUT);  
-    }
+    : RotorMotorController{controller_pins} {}
     ~Rotor() = default;
 
     void set_dutycycle(uint16_t value) { 
@@ -25,12 +22,12 @@ struct Rotor : public RotorMotorController {
 };
 
 class RotorInterface {
-    std::array<Rotor, N_LEGS> rotors;
+    std::array<Rotor, Leg::COUNT> rotors;
     RotorSignalSelector multiplexer;
 
   public:
-    const uint8_t CUBE_ORANGE_PWM_OUTPUT = RotorSignalSelector::IRRELEVANT_PIN;
-    const uint8_t MOTOR_ESC_PWM_INPUT = RotorSignalSelector::IRRELEVANT_PIN;
+    const uint8_t CUBE_ORANGE_PWM_OUTPUT = IRRELEVANT_PIN;
+    const uint8_t MOTOR_ESC_PWM_INPUT = IRRELEVANT_PIN;
     
     enum class RotorSignalSource { TEENSY, CUBE_ORANGE };
 
@@ -43,10 +40,10 @@ class RotorInterface {
       },
       multiplexer{{
         PIN_ROTOR_CHANNEL_SELECT,
-        rotors[FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
-        rotors[FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
-        rotors[FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
-        rotors[FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
+        rotors[Leg::FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
+        rotors[Leg::FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
+        rotors[Leg::FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
+        rotors[Leg::FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
         PIN_ROTOR_GROUND_SIGNALS
       }} {}
     ~RotorInterface(void) {
@@ -74,10 +71,10 @@ class RotorInterface {
         // rotors[RR].writeMicroseconds(rr_pwm);
         // rotors[RL].writeMicroseconds(rl_pwm);
         // rotors[FL].writeMicroseconds(fl_pwm);
-        rotors[FR].set_dutycycle(fr_pwm);
-        rotors[RR].set_dutycycle(rr_pwm);
-        rotors[RL].set_dutycycle(rl_pwm);
-        rotors[FL].set_dutycycle(fl_pwm);
+        rotors[Leg::FR].set_dutycycle(fr_pwm);
+        rotors[Leg::RR].set_dutycycle(rr_pwm);
+        rotors[Leg::RL].set_dutycycle(rl_pwm);
+        rotors[Leg::FL].set_dutycycle(fl_pwm);
     }
 };
 

@@ -8,7 +8,7 @@
 
 #include "robot.hpp"
 #include "commands.hpp"
-#include "assembly/definitions.hpp"
+// #include "hardware/wiring/definitions.hpp"
 
 /** M4 ROBOT ARCHITECTURE -------------------------------------------------- */
 
@@ -34,8 +34,13 @@ ros::Subscriber<geometry_msgs::Pose> sub_robot_pose_estimate("/robot/pose_estima
 ros::Subscriber<geometry_msgs::Twist> sub_robot_twist_command("/robot/twist_command", &msg_cb_robot_twist_command);
 
 /** TEENSY CODE SPECIFICS -------------------------------------------------- */
+#include "hardware/component/Imu_BNO055.hpp"
+#define DEBUG
+Imu_BNO055 imutest{{18, 19}};
 
 void setup() {
+#ifdef DEBUG
+#else
     ros_node_teensy.initNode();
     ros_node_teensy.advertise(pub_im_alive);
 
@@ -48,9 +53,13 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
 
     attachInterrupt(REBOOT_PIN, _reboot_Teensyduino_, RISING); 
+#endif//DEBUG
 }
 
-void loop() {   
+void loop() { 
+#ifdef DEBUG
+    imutest.test();
+#else
     robot.RoverController::test(0);
     robot.DroneController::test(0); 
 
@@ -63,6 +72,7 @@ void loop() {
         pub_im_alive.publish(&msg_im_alive);
     }
     ros_node_teensy.spinOnce();
+#endif//DEBUG
 }
 
 /** ------------------------------------------------------------------------ */

@@ -3,12 +3,12 @@
 
 #include <Arduino.h>
 
-#include "controllers/rover_controller.hpp"
-#include "controllers/drone_controller.hpp"
-#include "controllers/segway_controller.hpp"
+#include "estimator/state_estimator.hpp"
+#include "controller/rover_controller.hpp"
+#include "controller/drone_controller.hpp"
+#include "controller/segway_controller.hpp"
 
-
-class M4Robot : public RoverController, public DroneController, public SegwayController {
+class M4Robot : public StateEstimator, public RoverController, public DroneController, public SegwayController {
     float px, py, pz, qx, qy, qz, qw;
     float lin_vel, ang_vel;
   public:

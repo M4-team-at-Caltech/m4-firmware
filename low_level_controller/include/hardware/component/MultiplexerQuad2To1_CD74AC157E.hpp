@@ -4,9 +4,10 @@
 #include <Arduino.h>
 #include <vector>
 
+#include "hardware/assembly/definitions.hpp"
+
 class MultiplexerQuad2To1_CD74AC157E {
   public:
-    static const uint8_t IRRELEVANT_PIN = 255;
     const uint8_t PinSelect;
     const uint8_t Pin1A;        
     const uint8_t Pin1B;        

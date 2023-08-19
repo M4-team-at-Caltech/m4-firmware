@@ -1,4 +1,4 @@
-#include "controllers/rover_controller.hpp"
+#include "controller/rover_controller.hpp"
 
 #define TURNING_GAIN 0.75              // scaling for turning inputs
 #define WHEEL_COMMAND_DEADZONE 0.1     // deadzone around 0 speed
@@ -47,7 +47,7 @@ void RoverController::init(void) {
     WheelInterface::enable_motors();
 }
 
-void RoverController::update(float lin_vel, float ang_vel) {
+void RoverController::update(void) {
     float cmd_r = lin_vel - TURNING_GAIN * ang_vel;
     float cmd_l = lin_vel + TURNING_GAIN * ang_vel;
     

@@ -29,8 +29,9 @@ auto M4Robot::set_pose(float px, float py, float pz, float qx, float qy, float q
 }
 
 auto M4Robot::set_velocity(float lin_vel, float ang_vel) -> uint8_t {
-    this->lin_vel = lin_vel;
-    this->ang_vel = ang_vel;
+    // this->lin_vel = lin_vel;
+    // this->ang_vel = ang_vel;
+    RoverController::set_speed(lin_vel, ang_vel);
     return 0;
 }
 
@@ -39,13 +40,13 @@ void M4Robot::run_controller(void) {
 
     switch(mode) {
       case Mobility::ROVER:
-        RoverController::update(lin_vel, ang_vel);
+        RoverController::update();
         break;
       case Mobility::DRONE:
         DroneController::update();
         break;
       case Mobility::SEGWAY:
-        SegwayController::update(lin_vel, ang_vel);
+        SegwayController::update();
         break;
     }
 }
