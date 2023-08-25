@@ -100,14 +100,7 @@ class WheelInterface {
 
     Wheel& get_wheel(char id) { return wheels[id]; }
 
-    // std::array<int32_t, Leg::COUNT> get_position(void) {
-    //     return {
-    //         wheels[Leg::FR].get_position(),
-    //         wheels[Leg::RR].get_position(),
-    //         wheels[Leg::RL].get_position(),
-    //         wheels[Leg::FL].get_position()        
-    //     };
-    // }
+    void init() {}
 };
 
 #endif//WHEEL_INTERFACE

@@ -2,6 +2,13 @@
 
 #include "robot.hpp"
 
+void M4Robot::init_hardware(void) {    
+    BodyInterface::init();
+    RotorInterface::init();
+    WheelInterface::init();
+}
+
+
 void M4Robot::transform(Mobility mode) {
     stop_operations();
     this->mode = mode;
@@ -60,4 +67,20 @@ void M4Robot::stop_operations(void) {
     RotorInterface::disable_rotors();
 
     assign_pilot(Authority::NONE);
+}
+
+
+
+void M4Robot::test(UnitTest id) {
+    switch(id) {
+      case UnitTest::BODY:
+        Serial.print("\nX "); Serial.print(body.get_roll());
+        Serial.print("\tY "); Serial.print(body.get_pitch());
+        Serial.print("\tZ "); Serial.print(body.get_yaw());
+        delay(50);
+        break;
+      case UnitTest::IMU: 
+        BodyInterface::test(UnitTest::IMU);
+      default:;
+    }
 }

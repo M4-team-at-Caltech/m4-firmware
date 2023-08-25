@@ -4,7 +4,7 @@
 #include <Servo.h>
 #include <array>
 
-#include "hardware/component/Led_.hpp"
+#include "hardware/component/Led_*.hpp"
 #include "hardware/assembly/teensy_pin_allocation.hpp"
 
 using ActionIndicator = LedController;
@@ -15,6 +15,7 @@ struct ServoSimulator : public ActionIndicator {
 };
 
 class ServoInterface {
+  public:
     ServoSimulator servo_sim; // one indicator for 2*N_LEGS
 
     ServoInterface(void): servo_sim{ServoSimulator{LED_BUILTIN}} {}
@@ -23,6 +24,8 @@ class ServoInterface {
     void show_activity(bool state) {
         servo_sim.set_led_state(state);
     }
+
+    void init() {}
 };
 
 #endif//SERVO_INTERFACE

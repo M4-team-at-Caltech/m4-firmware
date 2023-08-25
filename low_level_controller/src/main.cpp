@@ -8,7 +8,7 @@
 
 #include "robot.hpp"
 #include "commands.hpp"
-// #include "hardware/wiring/definitions.hpp"
+#include "unit_test.hpp"
 
 /** M4 ROBOT ARCHITECTURE -------------------------------------------------- */
 
@@ -34,12 +34,13 @@ ros::Subscriber<geometry_msgs::Pose> sub_robot_pose_estimate("/robot/pose_estima
 ros::Subscriber<geometry_msgs::Twist> sub_robot_twist_command("/robot/twist_command", &msg_cb_robot_twist_command);
 
 /** TEENSY CODE SPECIFICS -------------------------------------------------- */
-#include "hardware/component/Imu_BNO055.hpp"
-#define DEBUG
-Imu_BNO055 imutest{{18, 19}};
+
+// #define DEBUG
 
 void setup() {
 #ifdef DEBUG
+    Serial.begin(115200);
+    robot.init_hardware();
 #else
     ros_node_teensy.initNode();
     ros_node_teensy.advertise(pub_im_alive);
@@ -50,25 +51,24 @@ void setup() {
     ros_node_teensy.subscribe(sub_robot_pose_estimate);
     ros_node_teensy.subscribe(sub_robot_twist_command);
 
-    pinMode(LED_BUILTIN, OUTPUT);
-
-    attachInterrupt(REBOOT_PIN, _reboot_Teensyduino_, RISING); 
+    robot.init_hardware();
+    attachInterrupt(PIN_REBOOT, _reboot_Teensyduino_, RISING); 
 #endif//DEBUG
 }
 
 void loop() { 
 #ifdef DEBUG
-    imutest.test();
-#else
-    robot.RoverController::test(0);
-    robot.DroneController::test(0); 
-
     static time_t loop_time = millis();
     if(millis() - loop_time >= M4Robot::MIN_LOOP_INTERVAL_MS) {
         loop_time = millis();
-        
+        robot.BodyInterface::test(UnitTest::IMU);
+        Serial.println("here");
+    }
+#else
+    static time_t loop_time = millis();
+    if(millis() - loop_time >= M4Robot::MIN_LOOP_INTERVAL_MS) {
+        loop_time = millis();
         robot.run_controller();
-
         pub_im_alive.publish(&msg_im_alive);
     }
     ros_node_teensy.spinOnce();

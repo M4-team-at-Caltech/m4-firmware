@@ -76,6 +76,8 @@ class RotorInterface {
         rotors[Leg::RL].set_dutycycle(rl_pwm);
         rotors[Leg::FL].set_dutycycle(fl_pwm);
     }
+
+    void init() {}
 };
 
 #endif//ROTOR_INTERFACE

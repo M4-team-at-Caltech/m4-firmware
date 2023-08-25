@@ -3,7 +3,7 @@
 void SegwayController::test(int id) {
     if(!id) return;
     switch (id) {
-        //todo
+        
       default:;
     }
 }
@@ -17,8 +17,7 @@ void SegwayController::init(void) {
 
 void SegwayController::update() {
     static float right_wheel_init_angle = 0, left_wheel_init_angle = 0;
-
-    auto switch_state = [&](SegwayState state) { 
+    static auto switch_state = [&](SegwayState state) { 
         rotor_controller.reset();
         body_controller.reset();
         wheel_controller.reset();
