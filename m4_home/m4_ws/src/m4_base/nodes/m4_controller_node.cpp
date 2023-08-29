@@ -95,6 +95,23 @@ enum M4Mode
 	MODE_UAV
 }current_mode;
 
+enum TeensyMode
+{
+	POSE_RECEIVED,
+    TWIST_ACK,
+
+    TRANSFORM_ROVER, 
+    DRIVE,
+    TRANSFORM_DRONE, 
+    FLY,
+    TRANSFORM_SEGWAY,
+    BALANCE,
+    STOP,
+
+    KILL_ALL,
+    NOT_IMPLEMENTED
+}teensy_mode;
+
 float xvel_state;
 float yvel_state;
 
@@ -201,9 +218,10 @@ void send_teensy_stop(ros::Publisher &teensy_cmd_pub)
 	{
 		ROS_WARN("Sending teensy stop");
 		std_msgs::UInt8 cmd_msg;
-		cmd_msg.data = 0;
+		cmd_msg.data = TeensyMode::STOP;
 		teensy_cmd_pub.publish(cmd_msg);
 		teensy_running = false;
+		teensy_mode = TeensyMode::STOP;
 	}
 }
 
@@ -280,12 +298,6 @@ int main(int argc, char **argv)
 					if(mip_channel_state == MIPMode::MODE_MIP_DISABLE && uav_channel_state == UAVMode::MODE_UAV_DISABLE)
 					{
 						current_mode = M4Mode::MODE_DRIVE;
-						if(!teensy_control)
-						{
-							// TODO: Send message to teensy to take back control
-							ROS_WARN("Taking back teensy control");
-							teensy_control = true;
-						}
 						
 						// Make any required transformations
 						switch(drive_channel_state)
@@ -348,6 +360,15 @@ int main(int argc, char **argv)
 								break;
 						}
 
+						if(teensy_mode != TeensyMode::DRIVE)
+						{
+							ROS_WARN("Teensy drive mode");
+							std_msgs::UInt8 cmd_msg;
+							cmd_msg.data = TeensyMode::DRIVE;
+							teensy_cmd_pub.publish(cmd_msg);
+							teensy_mode = TeensyMode::DRIVE;
+						}
+
 						if(teensy_running)
 						{
 							send_teensy_vel(teensy_vel_pub);
@@ -358,12 +379,6 @@ int main(int argc, char **argv)
 					else if(mip_channel_state != MIPMode::MODE_MIP_DISABLE && (current_mode == M4Mode::MODE_DRIVE || current_mode == M4Mode::MODE_MIP))
 					{
 						current_mode = M4Mode::MODE_MIP;
-						if(!teensy_control)
-						{
-							// TODO: Send message to teensy to take back control
-							ROS_WARN("Taking back teensy control");
-							teensy_control = true;
-						}
 						
 						// Make any transformations if needed
 						switch(mip_channel_state)
@@ -384,6 +399,15 @@ int main(int argc, char **argv)
 									m4.mip();
 								}
 
+								if(teensy_mode != TeensyMode::TRANSFORM_SEGWAY)
+								{
+									ROS_WARN("Teensy mip mode");
+									std_msgs::UInt8 cmd_msg;
+									cmd_msg.data = TeensyMode::TRANSFORM_SEGWAY;
+									teensy_cmd_pub.publish(cmd_msg);
+									teensy_mode = TeensyMode::TRANSFORM_SEGWAY;
+								}
+
 								break;
 
 							case MIPMode::MODE_MIP_READY:
@@ -396,10 +420,13 @@ int main(int argc, char **argv)
 									m4.mip();
 								}
 								
-								if(!teensy_running)
+								if(teensy_mode != TeensyMode::BALANCE)
 								{
-									// TODO: Send command to initializa MIP mode, wait for ack
-									teensy_running = true;
+									ROS_WARN("Teensy mip balance mode");
+									std_msgs::UInt8 cmd_msg;
+									cmd_msg.data = TeensyMode::BALANCE;
+									teensy_cmd_pub.publish(cmd_msg);
+									teensy_mode = TeensyMode::BALANCE;
 								}
 
 								break;		
@@ -424,11 +451,13 @@ int main(int argc, char **argv)
 								if(current_configuration == M4Configurations::UAV)
 								{
 									send_teensy_stop(teensy_cmd_pub);
-									if(!teensy_control)
+									if(teensy_mode != TeensyMode::TRANSFORM_DRONE)
 									{
-										// TODO: Send message to teensy to take back control
-										ROS_WARN("Taking back teensy control\n");
-										teensy_control = true;
+										ROS_WARN("Teensy uav mode");
+										std_msgs::UInt8 cmd_msg;
+										cmd_msg.data = TeensyMode::TRANSFORM_DRONE;
+										teensy_cmd_pub.publish(cmd_msg);
+										teensy_mode = TeensyMode::TRANSFORM_DRONE;
 									}
 
 									break;
@@ -437,11 +466,13 @@ int main(int argc, char **argv)
 								else // Move to uav configuration
 								{
 									send_teensy_stop(teensy_cmd_pub);
-									if(!teensy_control)
+									if(teensy_mode != TeensyMode::TRANSFORM_DRONE)
 									{
-										// TODO: Send message to teensy to take back control
-										ROS_WARN("Taking back teensy control\n");
-										teensy_control = true;
+										ROS_WARN("Teensy uav mode");
+										std_msgs::UInt8 cmd_msg;
+										cmd_msg.data = TeensyMode::TRANSFORM_DRONE;
+										teensy_cmd_pub.publish(cmd_msg);
+										teensy_mode = TeensyMode::TRANSFORM_DRONE;
 									}
 
 									ROS_WARN("Move to uav\n");
@@ -460,17 +491,19 @@ int main(int argc, char **argv)
 									m4.uav();
 								}
 								
-								if(teensy_control)
+								if(teensy_mode != TeensyMode::FLY)
 								{
-									// TODO: Tell teensy to switch control to pixhawk, wait for ack
-									ROS_WARN("Switching control to pixhawk\n");
-									teensy_control = false;
+									ROS_WARN("Teensy uav mode");
+									std_msgs::UInt8 cmd_msg;
+									cmd_msg.data = TeensyMode::FLY;
+									teensy_cmd_pub.publish(cmd_msg);
+									teensy_mode = TeensyMode::FLY;
 								}
 
 								break;		
 						}
 
-						if(!teensy_control)
+						if(teensy_mode == TeensyMode::FLY)
 							ROS_INFO("Pixhawk in control!");
 					}
 			

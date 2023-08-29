@@ -138,7 +138,7 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	read_start_address =  ADDR_PRESENT_CURRENT;
 	bool dxl_addparam_result = false;
 
-	groupSyncRead = new dynamixel::GroupFastSyncRead(portHandler, packetHandler, read_start_address, read_data_length);
+	groupSyncRead = new dynamixel::GroupSyncRead(portHandler, packetHandler, read_start_address, read_data_length);
 
 	// Add other motors read
 	for(int i = 0; i < active_joint_ids.size(); i++)

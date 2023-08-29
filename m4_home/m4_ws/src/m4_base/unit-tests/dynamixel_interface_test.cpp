@@ -30,25 +30,14 @@ void send_command_looped(DynamixelPositionInterface *dxl,vector<int> id_list)
 {
 
 	while (!stopFlag)
-	{
-		// List of dynamixel IDs to actuate for this test 
-		
+	{	
 		// FL
 		vector<float> goal_positions1 = {0, 90, 0, 90}; 
 		dxl->write_position(id_list, goal_positions1);
 		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-		vector<float> goal_positions2 = {90, 45, 90, 45}; 
-		dxl->write_position(id_list, goal_positions2);
-		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-		//backward		
+		vector<float> goal_positions2 = {0, 0, 0, 0}; 
 		dxl->write_position(id_list, goal_positions2);
 		std::this_thread::sleep_for(std::chrono::milliseconds(5000));		
-		dxl->write_position(id_list, goal_positions1);
-		std::this_thread::sleep_for(std::chrono::milliseconds(5000));		
-		vector<float> goal_positions3 = {0, 0, 0, 0}; 
-		dxl->write_position(id_list, goal_positions3);
-		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-
     }
 }
 
@@ -64,7 +53,7 @@ int main(int argc, char *argv[])
     // Create a DynamixelInterface object
 	DynamixelPositionInterface dxl(port, baudrate, id_list);
 
-    // // Set the goal positions
+    // Set the goal positions
 	thread cmd_thread(send_command_looped, &dxl, id_list);
 
 	cout << "Press q to quit" << endl;
