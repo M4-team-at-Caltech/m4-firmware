@@ -25,6 +25,8 @@ class ServoInterface {
         servo_sim.set_led_state(state);
     }
 
+    void disable_servos() {}
+
     void init() {}
 };
 
