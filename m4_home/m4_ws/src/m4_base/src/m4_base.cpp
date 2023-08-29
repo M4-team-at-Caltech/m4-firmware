@@ -574,31 +574,31 @@ void M4Base::custom_joint_pos(const std::vector<int> &ids, const std::vector<flo
 void M4Base::crouch(){
 	command_queue.push(M4Commands::CMD_CROUCH);
 	// Wait until it completes
-	while(!current_configuration == M4Configurations::CROUCH){std::this_thread::sleep_for(std::chrono::milliseconds(int(1/CONTROL_LOOP_RATE)));}
+	while(!current_configuration == M4Configurations::CROUCH){std::this_thread::sleep_for(std::chrono::milliseconds(int(1000/CONTROL_LOOP_RATE)));}
 }
 
 void M4Base::stand(){
     command_queue.push(M4Commands::CMD_STAND);
 	// Wait until it completes
-	while(!current_configuration == M4Configurations::STAND){std::this_thread::sleep_for(std::chrono::milliseconds(int(1/CONTROL_LOOP_RATE)));}
+	while(!current_configuration == M4Configurations::STAND){std::this_thread::sleep_for(std::chrono::milliseconds(int(1000/CONTROL_LOOP_RATE)));}
 }
 
 void M4Base::sit(){
     command_queue.push(M4Commands::CMD_SIT);
 	// Wait until it completes
-	while(!current_configuration == M4Configurations::SIT){std::this_thread::sleep_for(std::chrono::milliseconds(int(1/CONTROL_LOOP_RATE)));}
+	while(!current_configuration == M4Configurations::SIT){std::this_thread::sleep_for(std::chrono::milliseconds(int(1000/CONTROL_LOOP_RATE)));}
 }
 
 void M4Base::uav(){
     command_queue.push(M4Commands::CMD_UAV);
 	// Wait until it completes
-	while(!current_configuration == M4Configurations::UAV){std::this_thread::sleep_for(std::chrono::milliseconds(int(1/CONTROL_LOOP_RATE)));}
+	while(!current_configuration == M4Configurations::UAV){std::this_thread::sleep_for(std::chrono::milliseconds(int(1000/CONTROL_LOOP_RATE)));}
 }
 
 void M4Base::mip(){
     command_queue.push(M4Commands::CMD_MIP);
 	// Wait until it completes
-	while(!current_configuration == M4Configurations::MIP){std::this_thread::sleep_for(std::chrono::milliseconds(int(1/CONTROL_LOOP_RATE)));}
+	while(!current_configuration == M4Configurations::MIP){std::this_thread::sleep_for(std::chrono::milliseconds(int(1000/CONTROL_LOOP_RATE)));}
 }
 
 M4Configurations M4Base::get_current_configuration()
