@@ -6,6 +6,8 @@ void M4Robot::init_hardware(void) {
     BodyInterface::init();
     RotorInterface::init();
     WheelInterface::init();
+    
+    attachInterrupt(PIN_REBOOT, _reboot_Teensyduino_, RISING); 
 }
 
 
@@ -63,8 +65,13 @@ void M4Robot::assign_pilot(Authority pilot) {
 }
 
 void M4Robot::stop_operations(void) {
+    RoverController::stop();
+    DroneController::stop();
+    SegwayController::stop();
+
     WheelInterface::disable_motors();
     RotorInterface::disable_rotors();
+    ServoInterface::disable_servos();
 
     assign_pilot(Authority::NONE);
 }
@@ -81,6 +88,16 @@ void M4Robot::test(UnitTest id) {
         break;
       case UnitTest::IMU: 
         BodyInterface::test(UnitTest::IMU);
+        break;
+      case UnitTest::WHEELS:
+        WheelInterface::set_unit_speed(0.1, 0, 0, 0);
+        delay(2000);
+        WheelInterface::set_unit_speed(0, 0.1, 0, 0);
+        delay(2000);
+        WheelInterface::set_unit_speed(0, 0, 0.1, 0);
+        delay(2000);
+        WheelInterface::set_unit_speed(0, 0, 0, 0.1);
+        delay(2000);
       default:;
     }
 }

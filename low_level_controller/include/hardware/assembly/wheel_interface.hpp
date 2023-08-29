@@ -46,9 +46,9 @@ class WheelInterface {
 
     WheelInterface(void)
     : wheels{
-        Wheel{{PIN_FRONT_RIGHT_WHEEL_MOTOR_ESC}, {PIN_FRONT_RIGHT_WHEEL_SENSOR }, 1, 1},
+        Wheel{{PIN_FRONT_RIGHT_WHEEL_MOTOR_ESC}, {PIN_FRONT_RIGHT_WHEEL_SENSOR }, 0, 1},
         Wheel{{PIN_REAR_RIGHT_WHEEL_MOTOR_ESC}, {PIN_REAR_RIGHT_WHEEL_SENSOR}, 1, 1},
-        Wheel{{PIN_REAR_LEFT_WHEEL_MOTOR_ESC}, {PIN_REAR_LEFT_WHEEL_SENSOR }, 0, 0},
+        Wheel{{PIN_REAR_LEFT_WHEEL_MOTOR_ESC}, {PIN_REAR_LEFT_WHEEL_SENSOR }, 1, 0},
         Wheel{{PIN_FRONT_LEFT_WHEEL_MOTOR_ESC}, {PIN_FRONT_LEFT_WHEEL_SENSOR }, 0, 0}
       } {}
     ~WheelInterface(void) {
@@ -67,6 +67,7 @@ class WheelInterface {
 
     void disable_motors(void) {
         set_unit_speed(0, 0, 0, 0);
+        brake(1);
         // wheels[FR].stop(0);
         // wheels[RR].stop(0);
         // wheels[RL].stop(0);
@@ -88,7 +89,7 @@ class WheelInterface {
     }
     void set_unit_speed(float fr_uvel, float rr_uvel, float rl_uvel, float fl_uvel) {
         static auto dir = [](float uvel) { return uvel > 0; };
-        static auto dty = [](float uvel) { return constrain(abs(uvel) * 100., 0., 100.); };
+        static auto dty = [](float uvel) { return constrain(abs(uvel) * 100., 0., 30.); };
 
         set_dutycycle(dty(fr_uvel), dty(rr_uvel), dty(rl_uvel), dty(fl_uvel));
         set_direction(dir(fr_uvel), dir(rr_uvel), dir(rl_uvel), dir(fl_uvel));

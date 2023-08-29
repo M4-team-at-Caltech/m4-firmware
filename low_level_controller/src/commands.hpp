@@ -1,3 +1,6 @@
+#ifndef COMMANDS
+#define COMMANDS
+
 enum class Command {
     POSE_RECEIVED,
     TWIST_ACK,
@@ -13,3 +16,5 @@ enum class Command {
     KILL_ALL,
     NOT_IMPLEMENTED,
 };
+
+#endif//COMMMANDS

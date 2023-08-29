@@ -41,7 +41,7 @@ class SegwayController: public BaseController, public virtual WheelInterface, pu
     float target_movement = 0;
     void init(void);
     void update(); //todo likely missing some end/transition conditions
-    void stop() {}
+    void stop(void);
 
     enum class SegwayState { UPRIGHT, BALANCE, SETDOWN } state = SegwayState::UPRIGHT;
     // void switch_state(SegwayState state);

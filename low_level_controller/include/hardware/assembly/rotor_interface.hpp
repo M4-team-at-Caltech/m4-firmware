@@ -55,11 +55,13 @@ class RotorInterface {
     }
 
     void enable_rotors(void) {
-        multiplexer.ground_signals(0);
+        // multiplexer.ground_signals(0);
+        set_signal_source(RotorSignalSource::CUBE_ORANGE);
     }
 
     void disable_rotors(void) {
-        multiplexer.ground_signals(1);    
+        // multiplexer.ground_signals(1);
+        set_signal_source(RotorSignalSource::TEENSY);
     }
 
     void set_signal_source(RotorSignalSource source) {

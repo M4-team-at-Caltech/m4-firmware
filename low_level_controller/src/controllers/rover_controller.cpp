@@ -51,7 +51,11 @@ void RoverController::update(void) {
     float cmd_r = lin_vel - TURNING_GAIN * ang_vel;
     float cmd_l = lin_vel + TURNING_GAIN * ang_vel;
     
-    set_unit_speed(cmd_r, cmd_r, cmd_l, cmd_l);
+    WheelInterface::set_unit_speed(cmd_r, cmd_r, cmd_l, cmd_l);
 }
 
+void RoverController::stop(void) {
+    WheelInterface::set_unit_speed(0, 0, 0, 0);
+    WheelInterface::brake(1);
+}
 

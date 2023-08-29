@@ -15,7 +15,7 @@ class RoverController: public BaseController, public virtual WheelInterface {
         this->ang_vel = ang_vel;
     }
     void update(void);
-    void stop(void) {}
+    void stop(void);
 };
 
 #endif//ROVER_CONTROLLER

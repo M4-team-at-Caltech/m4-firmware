@@ -52,7 +52,6 @@ void setup() {
     ros_node_teensy.subscribe(sub_robot_twist_command);
 
     robot.init_hardware();
-    attachInterrupt(PIN_REBOOT, _reboot_Teensyduino_, RISING); 
 #endif//DEBUG
 }
 

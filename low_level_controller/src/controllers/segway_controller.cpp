@@ -53,7 +53,7 @@ void SegwayController::update() {
             switch_state(SegwayState::BALANCE);
         }
       } break;
-      case SegwayState::BALANCE: {
+      case SegwayState::BALANCE: { //todo go down only if mode changes, do this in stop function
         wheel_controller.set_target(target_movement);
         float target_pitch = wheel_controller.get_output(wheel_angle_measure);
         body_controller.set_target(target_pitch);
@@ -79,3 +79,6 @@ void SegwayController::update() {
     }
 } 
 
+void SegwayController::stop(void) {
+    state = SegwayState::SETDOWN;
+}
