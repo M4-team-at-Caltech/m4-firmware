@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[])
 {
-	std::vector<int> active_joint_ids = {1};
+	std::vector<int> active_joint_ids = {1,2,3,4,5,6,7,8};
 	M4Base m4(active_joint_ids, true);
 	bool stopFlag(false);
 
