@@ -25,14 +25,14 @@ joints:
     # FL Leg
     FL_Frontal:
         id: 1              # Dynamixel motor ID
-        zero_tick: 1026    # Encoder tick corresponding to zero degrees position
-        min_tick: 1026     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2016     # max_tick = max_position_degrees / 0.087891
+        zero_tick: 1028    # Encoder tick corresponding to zero degrees position
+        min_tick: 1028     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 2058     # max_tick = max_position_degrees / 0.087891
         speed: 60          # degrees per second
     FL_Saggital:           
         # Reverse drive mode - CW = +ve, CCW = -ve
         id: 2              # Dynamixel motor ID
-        zero_tick: 1044    # Encoder tick corresponding to zero degrees position
+        zero_tick: 1015    # Encoder tick corresponding to zero degrees position
         min_tick: 794     # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2252     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 30          # degrees per second
@@ -47,7 +47,7 @@ joints:
         speed: 60          # degrees per second
     FR_Saggital:
         id: 4              # Dynamixel motor ID
-        zero_tick: 1146    # Encoder tick corresponding to zero degrees position
+        zero_tick: 1175    # Encoder tick corresponding to zero degrees position
         min_tick: 922      # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2380     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 30          # degrees per second
@@ -76,7 +76,7 @@ joints:
         speed: 60          # degrees per second
     BR_Saggital:
         id: 8              # Dynamixel motor ID
-        zero_tick: 1015    # Encoder tick corresponding to zero degrees position
+        zero_tick: 1030    # Encoder tick corresponding to zero degrees position
         min_tick: 776      # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2242     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 30          # degrees per second
@@ -84,6 +84,7 @@ joints:
 # Standard Configurations    
 config_stand: [0, 0, 0, 0, 0, 0, 0, 0]
 config_crouch: [0, 60, 0, 60, 0, 60, 0, 60]
-config_sit: [0, 90, 0, 90, 0, 90, 0, 90]
+config_crouch2: [0, 90, 0, 90, 0, 90, 0, 90]
+config_sit: [0, 95, 0, 95, 0, 95, 0, 95]
 config_uav: [90, 45, 90, 45, 90, 45, 90, 45]
 config_mip: [90, 45, 90, 45, 0, 90, 0, 90]
