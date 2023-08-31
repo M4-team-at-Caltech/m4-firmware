@@ -97,6 +97,7 @@ enum M4Mode
 
 enum TeensyCmd
 {
+	TEENSY_INIT,
 	POSE_RECEIVED,
     TWIST_ACK,
 
@@ -106,7 +107,7 @@ enum TeensyCmd
 	UAV_ENABLE=103,
 	MIP_BALANCE=104,
 	STOP=105,
-}teensy_cmd;
+}teensy_cmd_flag;
 
 float xvel_state;
 float yvel_state;
@@ -204,8 +205,11 @@ void init_configs(std::string config_path)
 	arm_config.ground_mode_arm = config["arming"]["ground_mode_arm"].as<int>();
 	arm_config.aerial_mode_arm = config["arming"]["aerial_mode_arm"].as<int>();
 
-	teensy_running = false;
-	teensy_control = true;
+	drive_mode = false;
+	teensy_ack = false;
+	rc_state_available = false;
+	pixhawk_state_available = false;
+	teensy_cmd_flag = TeensyCmd::TEENSY_INIT;
 }
 
 // Teensy command interface
@@ -215,13 +219,15 @@ void teensy_cmd(ros::Publisher &teensy_cmd_pub, TeensyCmd cmd)
 	cmd_msg.data = cmd;
 	teensy_cmd_pub.publish(cmd_msg);
 
+
 	while(!teensy_ack)
 	{
+		ros::spinOnce();
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 
 	teensy_ack = false;
-	teensy_cmd = cmd;
+	teensy_cmd_flag = cmd;
 }
 
 void teensy_ack_subscriber(const std_msgs::UInt8 &ack_msg)
@@ -292,7 +298,7 @@ int main(int argc, char **argv)
 			{
 				// If disarmed do nothing
 				case ArmMode::MODE_DISARM:
-					if(teensy_cmd != TeensyCmd::STOP)
+					if(teensy_cmd_flag != TeensyCmd::STOP)
 					{
 						teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 						drive_mode = false;
@@ -315,7 +321,7 @@ int main(int argc, char **argv)
 								// Do nothing if already in stand configuration
 								if(current_configuration == M4Configurations::STAND)
 								{
-									if(!teensy_cmd == TeensyCmd::DRIVE)
+									if(teensy_cmd_flag != TeensyCmd::DRIVE)
 									{
 										drive_mode = true;
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
@@ -346,7 +352,7 @@ int main(int argc, char **argv)
 								// Do nothing if already in crouch configuration
 								if(current_configuration == M4Configurations::CROUCH)
 								{
-									if(!teensy_cmd == TeensyCmd::DRIVE)
+									if(teensy_cmd_flag != TeensyCmd::DRIVE)
 									{
 										drive_mode = true;
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
@@ -381,7 +387,7 @@ int main(int argc, char **argv)
 								// Do nothing if already in sit configuration
 								if(current_configuration == M4Configurations::SIT)
 								{
-									if(!teensy_cmd == TeensyCmd::DRIVE)
+									if(teensy_cmd_flag != TeensyCmd::DRIVE)
 									{
 										drive_mode = true;
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
@@ -413,7 +419,7 @@ int main(int argc, char **argv)
 
 						if(drive_mode)
 						{
-							send_teensy_vel(teensy_vel_pub);
+							teensy_vel_publisher(teensy_vel_pub);
 						}
 					}
 
@@ -429,7 +435,7 @@ int main(int argc, char **argv)
 								// Do nothing if already in mip configuration
 								if(current_configuration == M4Configurations::MIP)
 								{
-									if(!teensy_cmd == TeensyCmd::STOP)
+									if(!teensy_cmd_flag == TeensyCmd::STOP)
                                     {
                                         teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 										drive_mode = false;
@@ -473,7 +479,7 @@ int main(int argc, char **argv)
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::MIP_BALANCE);
 								}
 
-								if(!teensy_cmd == TeensyCmd::MIP_BALANCE)
+								if(!teensy_cmd_flag == TeensyCmd::MIP_BALANCE)
 								{
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::MIP_BALANCE);
 								}
@@ -494,7 +500,7 @@ int main(int argc, char **argv)
 								// Do nothing if already in uav configuration
 								if(current_configuration == M4Configurations::UAV)
 								{
-									if(!teensy_cmd == TeensyCmd::STOP)
+									if(!teensy_cmd_flag == TeensyCmd::STOP)
                                     {
                                         teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 										drive_mode = false;
@@ -532,7 +538,7 @@ int main(int argc, char **argv)
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 								}
 								
-								if(teensy_cmd != TeensyCmd::UAV_ENABLE)
+								if(teensy_cmd_flag != TeensyCmd::UAV_ENABLE)
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::UAV_ENABLE);
 
 								break;		

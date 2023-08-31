@@ -35,7 +35,7 @@ joints:
         zero_tick: 1015    # Encoder tick corresponding to zero degrees position
         min_tick: 794     # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2252     # max_tick = max_position_degrees / 0.087891 + zero_tick
-        speed: 30          # degrees per second
+        speed: 60          # degrees per second
     
     # FR Leg
     FR_Frontal:
@@ -50,7 +50,7 @@ joints:
         zero_tick: 1175    # Encoder tick corresponding to zero degrees position
         min_tick: 922      # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2380     # max_tick = max_position_degrees / 0.087891 + zero_tick
-        speed: 30          # degrees per second
+        speed: 60          # degrees per second
 
     # BL Leg
     BL_Frontal:
@@ -65,7 +65,7 @@ joints:
         zero_tick: 1037    # Encoder tick corresponding to zero degrees position
         min_tick: 792      # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2255     # max_tick = max_position_degrees / 0.087891 + zero_tick
-        speed: 30          # degrees per second
+        speed: 60          # degrees per second
 
     # BR Leg
     BR_Frontal:
@@ -79,12 +79,12 @@ joints:
         zero_tick: 1030    # Encoder tick corresponding to zero degrees position
         min_tick: 776      # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2242     # max_tick = max_position_degrees / 0.087891 + zero_tick
-        speed: 30          # degrees per second
+        speed: 60          # degrees per second
 
 # Standard Configurations    
 config_stand: [0, 0, 0, 0, 0, 0, 0, 0]
 config_crouch: [0, 60, 0, 60, 0, 60, 0, 60]
 config_crouch2: [0, 90, 0, 90, 0, 90, 0, 90]
-config_sit: [0, 95, 0, 95, 0, 95, 0, 95]
-config_uav: [90, 45, 90, 45, 90, 45, 90, 45]
+config_sit: [0, 110, 0, 110, 0, 110, 0, 110]
+config_uav: [90, 20, 90, 20, 90, 20, 90, 20]
 config_mip: [90, 45, 90, 45, 0, 90, 0, 90]

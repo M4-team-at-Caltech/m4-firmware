@@ -11,6 +11,7 @@ enum M4Commands
 {
 	CMD_STAND,
 	CMD_CROUCH,
+	CMD_CROUCH2,
 	CMD_SIT,
 	CMD_UAV,
 	CMD_MIP,
@@ -65,6 +66,7 @@ class M4Base
 
 		std::vector<float> stand_configuration;
 		std::vector<float> crouch_configuration;
+		std::vector<float> crouch2_configuration;
 		std::vector<float> sit_configuration;
 		std::vector<float> uav_configuration;
 		std::vector<float> mip_configuration;
@@ -110,6 +112,7 @@ class M4Base
 
 		void execute_stand(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_crouch(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
+		void execute_crouch2(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_sit(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_uav(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_mip(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);

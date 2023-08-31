@@ -28,6 +28,7 @@ M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_
 
 	stand_configuration = get_active_joint_positions(config["config_stand"].as<std::vector<float>>());
 	crouch_configuration = get_active_joint_positions(config["config_crouch"].as<std::vector<float>>());
+	crouch2_configuration = get_active_joint_positions(config["config_crouch2"].as<std::vector<float>>());
 	sit_configuration = get_active_joint_positions(config["config_sit"].as<std::vector<float>>());
 	uav_configuration = get_active_joint_positions(config["config_uav"].as<std::vector<float>>());
 	mip_configuration = get_active_joint_positions(config["config_mip"].as<std::vector<float>>());
@@ -84,6 +85,9 @@ void M4Base::control_loop()
                     break;
 				case M4Commands::CMD_CROUCH:
 					execute_crouch(command_step, command_active, gait_start);
+					break;
+				case M4Commands::CMD_CROUCH2:
+					execute_crouch2(command_step, command_active, gait_start);
 					break;
 				case M4Commands::CMD_SIT:
 					execute_sit(command_step, command_active, gait_start);
@@ -246,6 +250,9 @@ void M4Base::execute_crouch(int& command_step, bool& command_active, std::chrono
 	}
 	
 }
+
+void M4Base::execute_crouch2(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start)
+{}
 
 void M4Base::execute_sit(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start)
 {
