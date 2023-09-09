@@ -83,7 +83,7 @@ joints:
 
 # Standard Configurations    
 config_stand: [0, 0, 0, 0, 0, 0, 0, 0]
-config_crouch: [0, 60, 0, 60, 0, 60, 0, 60]
+config_crouch1: [0, 60, 0, 60, 0, 60, 0, 60]
 config_crouch2: [0, 90, 0, 90, 0, 90, 0, 90]
 config_sit: [0, 110, 0, 110, 0, 110, 0, 110]
 config_uav: [90, 20, 90, 20, 90, 20, 90, 20]

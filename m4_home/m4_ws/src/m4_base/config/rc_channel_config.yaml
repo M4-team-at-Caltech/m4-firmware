@@ -1,35 +1,35 @@
 drive_mode:
     channel_id: 7
-    stand: 1095
-    crouch: 1515
-    sit: 1935
+    stand: 1094
+    crouch1: 1514
+    crouch2: 1934
 
 mip_mode:
     channel_id: 8
-    drive: 1095
-    mip_transform: 1515
-    mip_ready: 1935 
+    drive: 1094
+    mip_transform: 1514
+    mip_ready: 1934 
   
 uav_mode:
     channel_id: 10
-    drive: 1935
-    uav_transform: 1515
-    uav_ready: 1095
+    drive: 1934
+    uav_transform: 1514
+    uav_ready: 1094
     
 x_velocity:
     channel_id: 2
-    min: 1095
-    zero: 1515
-    max: 1935
+    min: 1094
+    zero: 1514
+    max: 1934
 
 y_velocity:
     channel_id: 1
-    min: 1095
-    zero: 1515
-    max: 1935
+    min: 1094
+    zero: 1514
+    max: 1934
 
 arming:
     channel_id: 9
-    disarm: 1095
-    ground_mode_arm: 1515
-    aerial_mode_arm: 1935
+    disarm: 1094
+    ground_mode_arm: 1514
+    aerial_mode_arm: 1934

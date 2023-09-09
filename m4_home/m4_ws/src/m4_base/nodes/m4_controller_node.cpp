@@ -16,8 +16,8 @@ struct DriveConfig
 {
 	int channel_id;
 	int stand;
-	int crouch;
-	int sit;
+	int crouch1;
+	int crouch2;
 }drive_config;
 
 struct MIPConfig
@@ -63,8 +63,8 @@ struct ArmConfig
 enum DriveMode
 {
 	MODE_STAND,
-	MODE_CROUCH,
-	MODE_SIT
+	MODE_CROUCH1,
+	MODE_CROUCH2
 }drive_channel_state;
 
 enum MIPMode
@@ -125,10 +125,10 @@ void rc_subscriber_callback(const mavros_msgs::RCIn &rc_msg)
 	// Drive Channel
 	if (rc_msg.channels[drive_config.channel_id-1] == drive_config.stand) {
 		drive_channel_state = DriveMode::MODE_STAND;
-	} else if (rc_msg.channels[drive_config.channel_id-1] == drive_config.crouch) {
-		drive_channel_state = DriveMode::MODE_CROUCH;
-	} else if (rc_msg.channels[drive_config.channel_id-1] == drive_config.sit) {
-		drive_channel_state = DriveMode::MODE_SIT;
+	} else if (rc_msg.channels[drive_config.channel_id-1] == drive_config.crouch1) {
+		drive_channel_state = DriveMode::MODE_CROUCH1;
+	} else if (rc_msg.channels[drive_config.channel_id-1] == drive_config.crouch2) {
+		drive_channel_state = DriveMode::MODE_CROUCH2;
 	}
 
 	// MIP Channel
@@ -177,8 +177,8 @@ void init_configs(std::string config_path)
 
 	drive_config.channel_id = config["drive_mode"]["channel_id"].as<int>();
 	drive_config.stand = config["drive_mode"]["stand"].as<int>();
-	drive_config.crouch = config["drive_mode"]["crouch"].as<int>();
-	drive_config.sit = config["drive_mode"]["sit"].as<int>();
+	drive_config.crouch1 = config["drive_mode"]["crouch1"].as<int>();
+	drive_config.crouch2 = config["drive_mode"]["crouch2"].as<int>();
 
 	mip_config.channel_id = config["mip_mode"]["channel_id"].as<int>();
 	mip_config.drive = config["mip_mode"]["drive"].as<int>();
@@ -271,7 +271,10 @@ int main(int argc, char **argv)
 
 
 	std::vector<int> active_joint_ids = {1, 2, 3, 4, 5, 6, 7, 8};
-	M4Base m4(active_joint_ids, false);
+	M4Base m4(active_joint_ids, true);
+
+	sit();
+	stand();
 
 	ros::Rate loop_rate(200);
 
@@ -348,9 +351,9 @@ int main(int argc, char **argv)
 
 								break;
 
-							case DriveMode::MODE_CROUCH:
-								// Do nothing if already in crouch configuration
-								if(current_configuration == M4Configurations::CROUCH)
+							case DriveMode::MODE_CROUCH1:
+								// Do nothing if already in crouch1 configuration
+								if(current_configuration == M4Configurations::CROUCH1)
 								{
 									if(teensy_cmd_flag != TeensyCmd::DRIVE)
 									{
@@ -361,18 +364,18 @@ int main(int argc, char **argv)
 									break;
 								}
 
-								else // Move to crouch configuration
+								else // Move to crouch1 configuration
 								{
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									ROS_WARN("Move to crouch");
+									ROS_WARN("Move to crouch1");
 									
 									if(current_configuration == M4Configurations::STAND)
                                         teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
                                     else if(current_configuration == M4Configurations::SIT)
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
 									
-									m4.crouch();
+									m4.crouch1();
 
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -383,9 +386,9 @@ int main(int argc, char **argv)
 
 								break;
 
-							case DriveMode::MODE_SIT:
-								// Do nothing if already in sit configuration
-								if(current_configuration == M4Configurations::SIT)
+							case DriveMode::MODE_CROUCH2:
+								// Do nothing if already in crouch 2 configuration
+								if(current_configuration == M4Configurations::CROUCH2)
 								{
 									if(teensy_cmd_flag != TeensyCmd::DRIVE)
 									{
@@ -405,7 +408,7 @@ int main(int argc, char **argv)
 
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 
-									m4.sit();
+									m4.crouch2();
 
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -450,7 +453,7 @@ int main(int argc, char **argv)
 									
 									ROS_WARN("Move to mip");
 									
-									if(current_configuration != M4Configurations::SIT)
+									if(current_configuration != M4Configurations::CROUCH2)
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 
 									m4.mip();
@@ -469,7 +472,7 @@ int main(int argc, char **argv)
 									
 									ROS_WARN("Move to mip");
 									
-									if(current_configuration != M4Configurations::SIT)
+									if(current_configuration != M4Configurations::CROUCH2)
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 
 									m4.mip();
@@ -529,7 +532,7 @@ int main(int argc, char **argv)
 
 									ROS_WARN("Move to uav\n");
 
-									if(current_configuration != M4Configurations::SIT)
+									if(current_configuration != M4Configurations::CROUCH2)
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 
 									m4.uav();

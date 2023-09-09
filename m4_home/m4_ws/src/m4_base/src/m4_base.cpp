@@ -27,7 +27,7 @@ M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_
 	active_joint_names = get_active_joint_names();
 
 	stand_configuration = get_active_joint_positions(config["config_stand"].as<std::vector<float>>());
-	crouch_configuration = get_active_joint_positions(config["config_crouch"].as<std::vector<float>>());
+	crouch1_configuration = get_active_joint_positions(config["config_crouch1"].as<std::vector<float>>());
 	crouch2_configuration = get_active_joint_positions(config["config_crouch2"].as<std::vector<float>>());
 	sit_configuration = get_active_joint_positions(config["config_sit"].as<std::vector<float>>());
 	uav_configuration = get_active_joint_positions(config["config_uav"].as<std::vector<float>>());
@@ -37,8 +37,6 @@ M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_
 
 	control_thread = std::thread(&M4Base::control_loop, this);
     set_log_status(log_status);
-	
-	stand();
 }
 
 M4Base::~M4Base()
@@ -83,8 +81,8 @@ void M4Base::control_loop()
 				case M4Commands::CMD_STAND:
 					execute_stand(command_step, command_active, gait_start);
                     break;
-				case M4Commands::CMD_CROUCH:
-					execute_crouch(command_step, command_active, gait_start);
+				case M4Commands::CMD_CROUCH1:
+					execute_crouch1(command_step, command_active, gait_start);
 					break;
 				case M4Commands::CMD_CROUCH2:
 					execute_crouch2(command_step, command_active, gait_start);
@@ -97,9 +95,6 @@ void M4Base::control_loop()
 					break;
 				case M4Commands::CMD_MIP:
 					execute_mip(command_step, command_active, gait_start);
-					break;
-				case M4Commands::CMD_CUSTOM:
-					execute_custom(command_step, command_active, gait_start);
 					break;
 			}
 		}
@@ -124,9 +119,9 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			command_step = 0;
 			command_active = false;
 			return;
-		case M4Configurations::CROUCH:
+		case M4Configurations::CROUCH1:
+		case M4Configurations::CROUCH2:
 		case M4Configurations::SIT:
-		case M4Configurations::CUSTOM:
 		case M4Configurations::INIT:
 			// Step 1: Move to Standing
 			if(command_step == 0)
@@ -183,21 +178,22 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 	}
 }
 
-void M4Base::execute_crouch(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start)
+void M4Base::execute_crouch1(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start)
 {
 	switch(current_configuration)
 	{
-		case M4Configurations::CROUCH:
+		case M4Configurations::CROUCH1:
 			command_step = 0;
 			command_active = false;
 			return;
+		case M4Configurations::CROUCH2:
 		case M4Configurations::SIT:
 		case M4Configurations::STAND:
 
-			// Step 1: Move to crouch position
+			// Step 1: Move to crouch1 position
 			if(command_step == 0)
 			{
-				dxl.write_position(active_joint_ids, crouch_configuration);
+				dxl.write_position(active_joint_ids, crouch1_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -209,7 +205,7 @@ void M4Base::execute_crouch(int& command_step, bool& command_active, std::chrono
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
-				current_configuration = M4Configurations::CROUCH;
+				current_configuration = M4Configurations::CROUCH1;
 			}
 
 			break;
@@ -225,10 +221,10 @@ void M4Base::execute_crouch(int& command_step, bool& command_active, std::chrono
 				command_active = true;
 			}
 
-			// Step 1: Move to crouch position
+			// Step 1: Move to crouch1 position
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
 			{
-				dxl.write_position(active_joint_ids, crouch_configuration);
+				dxl.write_position(active_joint_ids, crouch1_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 2;
 				command_active = true;
@@ -240,19 +236,78 @@ void M4Base::execute_crouch(int& command_step, bool& command_active, std::chrono
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
-				current_configuration = M4Configurations::CROUCH;
+				current_configuration = M4Configurations::CROUCH1;
 			}
 
 			break;
-		
-		default:
-			printf("%s[WARN] Transformation defined only from standing configuration. Please move to standing configuration.%s\n", CONSOLE_MSG_WARN, CONSOLE_DEFAULT);
 	}
 	
 }
 
 void M4Base::execute_crouch2(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start)
-{}
+{
+	switch(current_configuration)
+	{
+		case M4Configurations::CROUCH2:
+			command_step = 0;
+			command_active = false;
+			return;
+		case M4Configurations::CROUCH1:
+		case M4Configurations::SIT:
+		case M4Configurations::STAND:
+
+			// Step 1: Move to crouch2 position
+			if(command_step == 0)
+			{
+				dxl.write_position(active_joint_ids, crouch2_configuration);
+				gait_start = std::chrono::system_clock::now();
+				command_step = 1;
+				command_active = true;
+			}
+
+			// Complete
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+			{
+				printf("[INFO] Crouch Transformation complete!\n");
+				command_step = 0;
+				command_active = false;
+				current_configuration = M4Configurations::CROUCH2;
+			}
+
+			break;
+
+		case M4Configurations::UAV:
+		case M4Configurations::MIP:
+			// Step 1: Move to sit position
+			if(command_step == 0)
+			{
+				dxl.write_position(active_joint_ids, sit_configuration);
+				gait_start = std::chrono::system_clock::now();
+				command_step = 1;
+				command_active = true;
+			}
+
+			// Step 1: Move to crouch2 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+			{
+				dxl.write_position(active_joint_ids, crouch2_configuration);
+				gait_start = std::chrono::system_clock::now();
+				command_step = 2;
+				command_active = true;
+			}
+
+			// Complete
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			{
+				printf("[INFO] Crouch Transformation complete!\n");
+				command_step = 0;
+				command_active = false;
+				current_configuration = M4Configurations::CROUCH2;
+			}
+
+			break;
+	}
+}
 
 void M4Base::execute_sit(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start)
 {
@@ -263,7 +318,8 @@ void M4Base::execute_sit(int& command_step, bool& command_active, std::chrono::_
 			command_active = false;
 			return;
 		case M4Configurations::STAND:
-		case M4Configurations::CROUCH:
+		case M4Configurations::CROUCH1:
+		case M4Configurations::CROUCH2:
 		case M4Configurations::UAV:
 		case M4Configurations::MIP:
 			// Step 1: Move to sit position
@@ -285,9 +341,6 @@ void M4Base::execute_sit(int& command_step, bool& command_active, std::chrono::_
 			}
 
 			break;
-
-		default:
-			printf("%s[WARN] Transformation defined only from standing configuration. Please move to standing configuration.%s\n", CONSOLE_MSG_WARN, CONSOLE_DEFAULT);
 	}
 }
 
@@ -300,7 +353,8 @@ void M4Base::execute_uav(int& command_step, bool& command_active, std::chrono::_
 			command_active = false;
 			return;
 			
-		case M4Configurations::CROUCH:
+		case M4Configurations::CROUCH1:
+		case M4Configurations::CROUCH2:
 		case M4Configurations::STAND:
 			// Step 1: Move to sit position
 			if(command_step == 0)
@@ -349,10 +403,6 @@ void M4Base::execute_uav(int& command_step, bool& command_active, std::chrono::_
 			}
 
 			break;
-
-		default:
-			printf("%s[WARN] Transformation defined only from standing configuration. Please move to standing configuration.%s\n", CONSOLE_MSG_WARN, CONSOLE_DEFAULT);
-
 	}
 }
 
@@ -364,7 +414,8 @@ void M4Base::execute_mip(int& command_step, bool& command_active, std::chrono::_
 			command_step = 0;
 			command_active = false;
 			return;
-		case M4Configurations::CROUCH:
+		case M4Configurations::CROUCH1:
+		case M4Configurations::CROUCH2:
 		case M4Configurations::STAND:
 			// Step 1: Move to sit position
 			if(command_step == 0)
@@ -413,31 +464,6 @@ void M4Base::execute_mip(int& command_step, bool& command_active, std::chrono::_
 			}
 
 			break;
-
-		default:
-			printf("%s[WARN] Transformation defined only from standing configuration. Please move to standing configuration.%s\n", CONSOLE_MSG_WARN, CONSOLE_DEFAULT);
-
-	}
-}
-
-void M4Base::execute_custom(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start)
-{
-	// Step 1: Move to positions
-	if(command_step == 0)
-	{
-		dxl.write_position(joint_position_cmd_ids, joint_position_cmd);
-		gait_start = std::chrono::system_clock::now();
-		command_step = 1;
-		command_active = true;
-	}
-
-	// Complete
-	if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= movement_time && command_step == 1)
-	{
-		printf("[INFO] Movement complete!\n");
-		command_step = 0;
-		command_active = false;
-		current_configuration = M4Configurations::CUSTOM;
 	}
 }
 
@@ -570,18 +596,16 @@ RobotState M4Base::get_state()
 	return robot_state.back();
 }
 
-void M4Base::custom_joint_pos(const std::vector<int> &ids, const std::vector<float> &positions, float movement_time)
-{
-	this->movement_time = movement_time;
-	joint_position_cmd = positions;
-	joint_position_cmd_ids = ids;
-	command_queue.push(M4Commands::CMD_CUSTOM);
+void M4Base::crouch1(){
+	command_queue.push(M4Commands::CMD_CROUCH1);
+	// Wait until it completes
+	while(!current_configuration == M4Configurations::CROUCH1){std::this_thread::sleep_for(std::chrono::milliseconds(int(1000/CONTROL_LOOP_RATE)));}
 }
 
-void M4Base::crouch(){
-	command_queue.push(M4Commands::CMD_CROUCH);
+void M4Base::crouch2(){
+	command_queue.push(M4Commands::CMD_CROUCH2);
 	// Wait until it completes
-	while(!current_configuration == M4Configurations::CROUCH){std::this_thread::sleep_for(std::chrono::milliseconds(int(1000/CONTROL_LOOP_RATE)));}
+	while(!current_configuration == M4Configurations::CROUCH2){std::this_thread::sleep_for(std::chrono::milliseconds(int(1000/CONTROL_LOOP_RATE)));}
 }
 
 void M4Base::stand(){

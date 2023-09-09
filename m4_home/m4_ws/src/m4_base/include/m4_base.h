@@ -10,23 +10,22 @@
 enum M4Commands
 {
 	CMD_STAND,
-	CMD_CROUCH,
+	CMD_CROUCH1,
 	CMD_CROUCH2,
 	CMD_SIT,
 	CMD_UAV,
-	CMD_MIP,
-	CMD_CUSTOM
+	CMD_MIP
 };
 
 enum M4Configurations
 {
 	INIT,
 	STAND,
-	CROUCH,
+	CROUCH1,
+	CROUCH2,
 	SIT,
 	UAV,
-	MIP,
-	CUSTOM
+	MIP
 };
 
 struct RobotState
@@ -52,11 +51,11 @@ class M4Base
 
 		// Transformations
 		void stand();
-		void crouch();
+		void crouch1();
+		void crouch2();
 		void sit();
 		void uav();
 		void mip();
-		void custom_joint_pos(const std::vector<int> &ids, const std::vector<float> &positions, float movement_time);
 
 	private:
 		DynamixelPositionInterface dxl;
@@ -65,7 +64,7 @@ class M4Base
 		M4Configurations current_configuration;
 
 		std::vector<float> stand_configuration;
-		std::vector<float> crouch_configuration;
+		std::vector<float> crouch1_configuration;
 		std::vector<float> crouch2_configuration;
 		std::vector<float> sit_configuration;
 		std::vector<float> uav_configuration;
@@ -111,12 +110,11 @@ class M4Base
 		void active_sleep(double sleep_time);
 
 		void execute_stand(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
-		void execute_crouch(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
+		void execute_crouch1(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_crouch2(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_sit(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_uav(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_mip(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
-		void execute_custom(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 
 		std::vector<float> joint_position_cmd;
 		std::vector<int> joint_position_cmd_ids;
