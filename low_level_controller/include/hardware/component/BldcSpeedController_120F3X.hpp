@@ -28,6 +28,7 @@ class BldcSpeedController_120F3X : public PwmController {
     const int PWM_MAX_TCKS = pow(2, PWM_RESOLUTION); 
     const int PWM_MIN_TCKS = PWM_MAX_TCKS / 2; 
     const int PWM_MID_TCKS = 0.5*(PWM_MIN_TCKS + PWM_MAX_TCKS);
+    const int PWM_TRIM = +20;
 
   public:
 
@@ -35,22 +36,15 @@ class BldcSpeedController_120F3X : public PwmController {
     : PinPwm{pins[0]}, Telemetry{nullptr}, bidirectional{bidirectional}, direction{direction},
       zero{bidirectional ? PWM_MID_TCKS : PWM_MIN_TCKS}, min_range{PWM_MIN_TCKS - zero}, max_range{PWM_MAX_TCKS - zero} {
         for(auto& pin : pins) pinMode(pin, OUTPUT_OPENDRAIN);
-        // attach(PinPwm);
-        // writeMicroseconds(zero);
         analogWriteFrequency(PinPwm, PWM_FREQUENCY); // pulse width modulation with 2ms period
+        if(bidirectional) zero += map(map(PWM_TRIM, -100, 100, MIN_PWM, MAX_PWM), MIN_PWM, MAX_PWM, PWM_MIN_TCKS, PWM_MAX_TCKS);
         analogWrite(PinPwm, zero);
-        // writeMicroseconds(zero+offset * direction);
-        // for(auto& pin : pins) pinMode(pin, OUTPUT);
-        // writeMicroseconds(1500);
-        // motor.attach(PinPwm);
-        // motor.writeMicroseconds(1500);
-        // telemetry.begin(DEFAULT_BAUD);
     }
     BldcSpeedController_120F3X(const PinVector& pins, HardwareSerial& telemetry, bool bidirectional, RotDir direction)
     : PinPwm{pins[0]}, Telemetry{&telemetry}, bidirectional{bidirectional}, direction{direction},
       zero{bidirectional ? PWM_MID_TCKS : PWM_MIN_TCKS}, min_range{PWM_MIN_TCKS - zero}, max_range{PWM_MAX_TCKS - zero} {
         for(auto& pin : pins) pinMode(pin, OUTPUT_OPENDRAIN);
-
+        if(bidirectional) zero += map(map(PWM_TRIM, -100, 100, MIN_PWM, MAX_PWM), MIN_PWM, MAX_PWM, PWM_MIN_TCKS, PWM_MAX_TCKS);
         analogWriteFrequency(PinPwm, PWM_FREQUENCY);
         analogWrite(PinPwm, zero);
     }
@@ -216,7 +210,7 @@ class BldcSpeedController_120F3X : public PwmController {
     const bool bidirectional;
     const RotDir direction;
 
-    const int zero, min_range, max_range;
+     int zero, min_range, max_range;
 };
 
 #endif//BLDC_SPEED_CONTROLLER_120F3X
