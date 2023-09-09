@@ -4,7 +4,7 @@
 #include <Servo.h>
 #include <array>
 
-#include "hardware/component/Led_*.hpp"
+#include "hardware/component/Led_.hpp"
 #include "hardware/assembly/teensy_pin_allocation.hpp"
 
 using ActionIndicator = LedController;

@@ -10,7 +10,9 @@ class DroneController: public BaseController, public virtual RotorInterface {
 
     void init(void);
     void update(void);
-    void stop(void) {}
+    void stop(void) {
+        RotorInterface::disable_rotors();
+    }
 };
 
 #endif//ROTOR_CONTROLLER

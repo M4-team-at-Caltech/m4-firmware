@@ -41,10 +41,10 @@ void SegwayController::update() {
       case SegwayState::UPRIGHT: {
         if(abs(body_pitch_measure) < UPRIGHT_SLOWDOWN_ANGLE) {
             rotor_controller.set_target(0.5*UPRIGHT_SPEED);
-            WheelInterface::set_dutycycle(0, UPRIGHT_WHEEL_ASSIST, UPRIGHT_WHEEL_ASSIST, 0);
+            WheelInterface::set_unit_speed(0, UPRIGHT_WHEEL_ASSIST, UPRIGHT_WHEEL_ASSIST, 0);
         } else {
             rotor_controller.set_target(UPRIGHT_SPEED);
-            WheelInterface::set_dutycycle(0, 0, 0, 0);
+            WheelInterface::set_unit_speed(0, 0, 0, 0);
         }
         float rotor_command = constrain(rotor_controller.get_output(body_pitch_measure), 0, UPRIGHT_MAX_THRUST);
         RotorInterface::set_dutycycle(rotor_command, 0, 0, rotor_command);
@@ -59,7 +59,7 @@ void SegwayController::update() {
         body_controller.set_target(target_pitch);
         float motor_command = body_controller.get_output(body_pitch_measure);
 
-        WheelInterface::set_dutycycle(0, motor_command, motor_command, 0);
+        WheelInterface::set_unit_speed(0, motor_command, motor_command, 0);
         // if(abs(body_pitch_measure) > SEGWAY_UPRIGHT_THRESHOLD) switch_state(SegwayState::BALANCE);
       } break;
       case SegwayState::SETDOWN: {
@@ -68,10 +68,10 @@ void SegwayController::update() {
 
         if(abs(body_pitch_measure) > SEGWAY_LANDING_THRESHOLD) {
             RotorInterface::set_dutycycle(0, 0, 0, 0);
-            WheelInterface::set_dutycycle(0, 0, 0, 0);
+            WheelInterface::set_unit_speed(0, 0, 0, 0);
         } else {
             RotorInterface::set_dutycycle(rotor_command, 0, 0, rotor_command);
-            WheelInterface::set_dutycycle(0, SEGWAY_TOUCHDOWN_WHEELSPEED, SEGWAY_TOUCHDOWN_WHEELSPEED, 0);
+            WheelInterface::set_unit_speed(0, SEGWAY_TOUCHDOWN_WHEELSPEED, SEGWAY_TOUCHDOWN_WHEELSPEED, 0);
         }
         // if(abs(body_pitch_measure) > SEGWAY_UPRIGHT_THRESHOLD) switch_state(SegwayState::BALANCE);
       } break;

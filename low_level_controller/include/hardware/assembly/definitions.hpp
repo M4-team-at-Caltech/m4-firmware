@@ -1,7 +1,6 @@
 #ifndef DEFINITIONS
 #define DEFINITIONS
 
-#define IRRELEVANT_PIN UINT8_MAX
 
 namespace Leg { 
     constexpr char FR = 0;
