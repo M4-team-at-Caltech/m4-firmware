@@ -12,12 +12,12 @@ using RotorMotorController = BldcSpeedController_120F3X;
 using RotorSignalSelector = MultiplexerQuad2To1_CD74AC157E;
 
 struct Rotor : public RotorMotorController {
-    Rotor(std::vector<uint8_t> controller_pins)
-    : RotorMotorController{controller_pins} {}
+    Rotor(std::vector<uint8_t> controller_pins, RotDir rotation_direction)
+    : RotorMotorController{controller_pins, false, rotation_direction} {}
     ~Rotor() = default;
 
     void set_dutycycle(uint16_t value) { 
-        RotorMotorController::set_dutycycle(value); //todo fix formula&rename function 
+        RotorMotorController::set_unit_signal(value); //todo fix formula&rename function 
     }
 };
 
@@ -33,17 +33,17 @@ class RotorInterface {
 
     RotorInterface(void)
     : rotors{ 
-        Rotor{{PIN_FRONT_RIGHT_ROTOR_PWM}}, 
-        Rotor{{PIN_REAR_RIGHT_ROTOR_PWM}}, 
-        Rotor{{PIN_REAR_LEFT_ROTOR_PWM}},
-        Rotor{{PIN_FRONT_LEFT_ROTOR_PWM}} 
+        Rotor{{PIN_FRONT_RIGHT_ROTOR_PWM}, RotDir::POS}, 
+        Rotor{{PIN_REAR_RIGHT_ROTOR_PWM},  RotDir::POS}, 
+        Rotor{{PIN_REAR_LEFT_ROTOR_PWM},   RotDir::POS},
+        Rotor{{PIN_FRONT_LEFT_ROTOR_PWM},  RotDir::POS} 
       },
       multiplexer{{
         PIN_ROTOR_CHANNEL_SELECT,
-        rotors[Leg::FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
-        rotors[Leg::FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
-        rotors[Leg::FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
-        rotors[Leg::FR].PinPwm, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
+        PIN_FRONT_RIGHT_ROTOR_PWM, CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT, //todo check this initalization
+        PIN_REAR_RIGHT_ROTOR_PWM,  CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
+        PIN_REAR_LEFT_ROTOR_PWM,   CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
+        PIN_FRONT_LEFT_ROTOR_PWM,  CUBE_ORANGE_PWM_OUTPUT, MOTOR_ESC_PWM_INPUT,
         PIN_ROTOR_GROUND_SIGNALS
       }} {}
     ~RotorInterface(void) {
@@ -80,6 +80,27 @@ class RotorInterface {
     }
 
     void init() {}
+
+    void test(int id) {
+        if(!id) return;
+        switch(id) {
+          case 1:
+            set_dutycycle(0.1,0.1,0.1,0.1);
+            disable_rotors();
+            delay(1000);
+            enable_rotors();
+            delay(3000);
+            set_dutycycle(0,0,0,0);
+            delay(1000);
+            break;
+          case 2:
+            enable_rotors();
+            break;
+          case 3:
+            disable_rotors();
+            break;
+        }
+    }
 };
 
 #endif//ROTOR_INTERFACE

@@ -34,6 +34,10 @@ void DroneController::test(int id) {
         set_signal_source(RotorSignalSource::CUBE_ORANGE);
         delay(3000);
         break;
+      case 2:
+        set_signal_source(RotorSignalSource::TEENSY);
+        set_dutycycle(10, 10, 10, 10);
+        delay(1000);
       default:;
     }
 }

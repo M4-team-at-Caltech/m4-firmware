@@ -44,6 +44,8 @@
         "streambuf": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "list": "cpp"
+        "list": "cpp",
+        "istream": "cpp",
+        "telemetryread_example_v2.c": "cpp"
     }
 }
