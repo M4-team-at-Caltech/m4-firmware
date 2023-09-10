@@ -27,7 +27,7 @@ joints:
         id: 1              # Dynamixel motor ID
         zero_tick: 1028    # Encoder tick corresponding to zero degrees position
         min_tick: 1028     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2058     # max_tick = max_position_degrees / 0.087891
+        max_tick: 2068     # max_tick = max_position_degrees / 0.087891
         speed: 60          # degrees per second
     FL_Saggital:           
         # Reverse drive mode - CW = +ve, CCW = -ve
