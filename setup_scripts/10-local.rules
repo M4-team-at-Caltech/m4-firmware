@@ -8,4 +8,4 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", SYMLINK+="U
 ACTION=="add", SUBSYSTEM=="usb-serial", DRIVER=="ftdi_sio", ATTR{latency_timer}="1"
 
 #Pixhawk
-ACTION=="add", ATTRS{idVendor}=="2dae", ATTRS{idProduct}=="1016", ATTRS{bInterfaceNumber}=="00", SYMLINK+="pixhawk"
+ACTION=="add", ATTRS{idVendor}=="2dae", ATTRS{idProduct}=="1016", SYMLINK+="pixhawk"
