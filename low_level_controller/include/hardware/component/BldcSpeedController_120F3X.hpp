@@ -8,13 +8,10 @@
 #include "hardware/assembly/definitions.hpp"
 #include "utilities.hpp"
 
-#define ANALOG_WRITE_RES    500
-#define MIN_WRITE_RANGE     pow
-#define MAX_WRITE_RANGE
-
 using RotDir = Sign;
 
 class BldcSpeedController_120F3X : public PwmController {
+float f500 = 500., f400 = 400.;
     const uint8_t PinPwm;
     HardwareSerial* Telemetry;
     float offset;
@@ -28,45 +25,104 @@ class BldcSpeedController_120F3X : public PwmController {
     const int PWM_MAX_TCKS = pow(2, PWM_RESOLUTION); 
     const int PWM_MIN_TCKS = PWM_MAX_TCKS / 2; 
     const int PWM_MID_TCKS = 0.5*(PWM_MIN_TCKS + PWM_MAX_TCKS);
-    const int PWM_TRIM = +20;
 
   public:
 
-    BldcSpeedController_120F3X(const PinVector& pins, bool bidirectional, RotDir direction)
-    : PinPwm{pins[0]}, Telemetry{nullptr}, bidirectional{bidirectional}, direction{direction},
+    BldcSpeedController_120F3X(const PinVector& pins, bool bidirectional, RotDir direction, int trim=0, float safety_factor=1)
+    : PinPwm{pins[0]}, Telemetry{nullptr}, bidirectional{bidirectional}, direction{direction}, trim{trim},
       zero{bidirectional ? PWM_MID_TCKS : PWM_MIN_TCKS}, min_range{PWM_MIN_TCKS - zero}, max_range{PWM_MAX_TCKS - zero} {
-        for(auto& pin : pins) pinMode(pin, OUTPUT_OPENDRAIN);
-        analogWriteFrequency(PinPwm, PWM_FREQUENCY); // pulse width modulation with 2ms period
-        if(bidirectional) zero += map(map(PWM_TRIM, -100, 100, MIN_PWM, MAX_PWM), MIN_PWM, MAX_PWM, PWM_MIN_TCKS, PWM_MAX_TCKS);
+        for(auto& pin : pins) pinMode(pin, OUTPUT);
+        // analogWriteFrequency(PinPwm, PWM_FREQUENCY); // pulse width modulation with 2ms period
+        freq_multiplier = (bidirectional ? f500 : f400) / PWM_FREQUENCY;
+        lower_safety_limit = freq_multiplier*(zero + safety_factor*min_range);
+        upper_safety_limit = freq_multiplier*(zero + safety_factor*max_range);
+        if(bidirectional) {
+            // zero = map(0.15*trim, -100., 100., PWM_MIN_TCKS, PWM_MAX_TCKS); //! 0.15 is the max speed of interface
+            analogWriteFrequency(PinPwm, f500);
+        } else {
+            // zero = map(900, 1000, 2000, PWM_MIN_TCKS, PWM_MAX_TCKS);
+            analogWriteFrequency(PinPwm, f400);
+        }
+        
+
+        uint32_t PREV_PWM_RESOLUTION = analogWriteResolution(PWM_RESOLUTION);   
         analogWrite(PinPwm, zero);
+        analogWriteResolution(PREV_PWM_RESOLUTION); 
+        #ifdef DEBUG
+        init();
+        #endif
     }
-    BldcSpeedController_120F3X(const PinVector& pins, HardwareSerial& telemetry, bool bidirectional, RotDir direction)
-    : PinPwm{pins[0]}, Telemetry{&telemetry}, bidirectional{bidirectional}, direction{direction},
+    BldcSpeedController_120F3X(const PinVector& pins, HardwareSerial& telemetry, bool bidirectional, RotDir direction, int trim=0, float safety_factor=1)
+    : PinPwm{pins[0]}, Telemetry{&telemetry}, bidirectional{bidirectional}, direction{direction}, trim{trim},
       zero{bidirectional ? PWM_MID_TCKS : PWM_MIN_TCKS}, min_range{PWM_MIN_TCKS - zero}, max_range{PWM_MAX_TCKS - zero} {
-        for(auto& pin : pins) pinMode(pin, OUTPUT_OPENDRAIN);
-        if(bidirectional) zero += map(map(PWM_TRIM, -100, 100, MIN_PWM, MAX_PWM), MIN_PWM, MAX_PWM, PWM_MIN_TCKS, PWM_MAX_TCKS);
-        analogWriteFrequency(PinPwm, PWM_FREQUENCY);
+        for(auto& pin : pins) pinMode(pin, OUTPUT);
+        freq_multiplier = (bidirectional ? f500 : f400) / PWM_FREQUENCY;
+        lower_safety_limit = freq_multiplier*(zero + safety_factor*min_range);
+        upper_safety_limit = freq_multiplier*(zero + safety_factor*max_range);
+        if(bidirectional) {
+            // zero = map(0.15*trim, -100., 100., PWM_MIN_TCKS, PWM_MAX_TCKS); //! 0.15 is the max speed of interface
+            analogWriteFrequency(PinPwm, f500);
+        } else {
+            // zero = map(900, 1000, 2000, PWM_MIN_TCKS, PWM_MAX_TCKS);
+            analogWriteFrequency(PinPwm, f400);
+        }
+
+
+        uint32_t PREV_PWM_RESOLUTION = analogWriteResolution(PWM_RESOLUTION);   
         analogWrite(PinPwm, zero);
+        analogWriteResolution(PREV_PWM_RESOLUTION); 
+        #ifdef DEBUG
+        init();
+        #endif
     }
     ~BldcSpeedController_120F3X() = default;
 
+
+    void init() {
+        Serial.print("Pin ");
+        Serial.print(PinPwm);
+        Serial.print(" @ ");
+        Serial.print(bidirectional ? f500 : f400);
+        Serial.print("Hz: zero = ");
+        Serial.print(zero);
+        Serial.print(", min_range = ");
+        Serial.print(zero + min_range);
+        Serial.print(" (lim: ");
+        Serial.print(lower_safety_limit);
+        Serial.print("), max_range = ");
+        Serial.print(zero + max_range);
+        Serial.print(" (lim: ");
+        Serial.print(upper_safety_limit);
+        Serial.print(")");
+        Serial.println();
+    }
     virtual void set_unit_signal(float value) {  
         uint32_t PREV_PWM_RESOLUTION = analogWriteResolution(PWM_RESOLUTION);   
+        float pwm_signal = zero;
         if(bidirectional) {
-            // assertm(-1 <= value && value <= 1, "Invalid value for bidirectional 120F3X");
-            // analogWrite(PinPwm, map(value * direction, -1., +1., 0., 256.));
-            // writeMicroseconds(zero + map(value * direction, -1., +1., min_range, max_range));
-            // analogWrite(zero + map(value * direction, -1., +1., min_range, max_range));
             value = constrain(value, -1., +1.);
-            analogWrite(PinPwm, zero + map(value * direction, -1., +1., min_range, max_range));
+            pwm_signal += map(value, -1., +1., min_range, max_range) * direction;
         } else {
-            // assertm(0 <= value && value <= 1, "Invalid value for 120F3X");
             value = constrain(value, 0., +1.);
-            analogWrite(PinPwm, zero + map(value,  0., +1., min_range, min_range));
-            // writeMicroseconds(zero + map(value, 0., +1., min_range, max_range));
+            pwm_signal += map(value, 0., +1., min_range, max_range);
+            pwm_signal *= freq_multiplier;
         }
-        // motor.writeMicroseconds(1550); // zero at 1514
-        // motor.writeMicroseconds(MID); // zero at 1514 // from 1200 to 2400
+        #ifdef DEBUG
+        Serial.print("Pin ");
+        Serial.print(PinPwm);
+        Serial.print(" SET ");
+        Serial.print(value);
+        Serial.print(" [-1,+1] --> ");
+        Serial.print(pwm_signal);
+        Serial.print(" [TCKS] is ");
+        Serial.print(map(pwm_signal, PWM_MIN_TCKS, PWM_MAX_TCKS, bidirectional?1000:1250, bidirectional?2000:2500));
+        Serial.print(" us");
+        Serial.println();
+        #endif
+
+        pwm_signal = constrain(pwm_signal, lower_safety_limit, upper_safety_limit);
+        analogWrite(PinPwm, pwm_signal);
+
         analogWriteResolution(PREV_PWM_RESOLUTION); 
     }
 
@@ -210,7 +266,10 @@ class BldcSpeedController_120F3X : public PwmController {
     const bool bidirectional;
     const RotDir direction;
 
-     int zero, min_range, max_range;
+    int trim;      // from experimentation
+    int zero, min_range, max_range;
+    float freq_multiplier;
+    float lower_safety_limit, upper_safety_limit; // factor [0-1] of maximum
 };
 
 #endif//BLDC_SPEED_CONTROLLER_120F3X

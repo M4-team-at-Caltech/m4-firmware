@@ -6,7 +6,7 @@ void DroneController::test(int id) {
       case 1:
         // wire red led to teensy, green to output
         set_signal_source(RotorSignalSource::TEENSY);
-        enable_rotors(); // off by default
+        handover_rotor_control(); // off by default
         // fluctuate both red and green
         set_dutycycle(100, 100, 100, 100);
         delay(1000);
@@ -17,9 +17,9 @@ void DroneController::test(int id) {
         set_dutycycle(50, 50, 50, 50);
         delay(1000);
         // red stays on, green off then comes back on for a sec
-        disable_rotors();
+        takeover_rotor_control();
         delay(1000);
-        enable_rotors();
+        handover_rotor_control();
         delay(1000);
         // cede signal to cube orange indicator
         set_dutycycle(100, 100, 100, 100);
@@ -44,8 +44,7 @@ void DroneController::test(int id) {
 
 
 void DroneController::init(void) {
-    RotorInterface::set_signal_source(RotorSignalSource::CUBE_ORANGE);
-    RotorInterface::enable_rotors();
+    RotorInterface::handover_rotor_control();
 }
 
 void DroneController::update(void) {

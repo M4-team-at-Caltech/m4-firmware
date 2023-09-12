@@ -11,7 +11,7 @@ class DroneController: public BaseController, public virtual RotorInterface {
     void init(void);
     void update(void);
     void stop(void) {
-        RotorInterface::disable_rotors();
+        RotorInterface::takeover_rotor_control();
     }
 };
 
