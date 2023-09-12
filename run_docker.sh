@@ -18,6 +18,7 @@ else
   docker run -it --rm --privileged --name ${CONTAINER_NAME} \
              --network="host" \
              -v ${HOST_DIRECTORY_PATH}:${CONTAINER_DIRECTORY_PATH} \
+             -v /etc/timezone:/etc/timezone:ro -v /etc/localtime:/etc/localtime:ro \
 	     -v /dev:/dev \
 	     --device-cgroup-rule "c 81:* rmw" \
 	     --device-cgroup-rule "c 189:* rmw" \
