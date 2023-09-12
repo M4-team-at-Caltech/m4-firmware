@@ -21,7 +21,8 @@ struct Wheel : public WheelMotorController, public WheelMotorEncoder {
     static constexpr float wheel_diameter = 0.4; // [m] //todo check value
 
     static constexpr float min_speed = 0.00, max_speed = 0.15; // max is 1.00 
-  protected:
+//   protected:
+public:
     // motor controller tweaks
     using WheelMotorController::set_unit_signal;
     // using WheelMotorController::set_dutycycle;
@@ -33,8 +34,8 @@ struct Wheel : public WheelMotorController, public WheelMotorEncoder {
   public:    
     const float cycles_per_revolution = Wheel::gear_ratio * WheelMotorEncoder::grating_resolution;
 
-    Wheel(PinVector controller_pins, RotDir rotation_direction, PinVector encoder_pins, EncDir encoding_direction, HardwareSerial& telemetry, float offset)
-    : WheelMotorController{controller_pins, telemetry, true, rotation_direction}, 
+    Wheel(PinVector controller_pins, RotDir rotation_direction, PinVector encoder_pins, EncDir encoding_direction, HardwareSerial& telemetry, int trim)
+    : WheelMotorController{controller_pins, telemetry, true, rotation_direction, trim, max_speed}, 
       WheelMotorEncoder{encoder_pins, encoding_direction} {}
     ~Wheel(void) = default;
 
@@ -83,10 +84,10 @@ class WheelInterface {
 
     WheelInterface(void)
     : wheels{
-        Wheel{{PIN_FRONT_RIGHT_WHEEL_PWM}, RotDir::POS, {PIN_FRONT_RIGHT_WHEEL_SENSOR}, EncDir::POS, PIN_FRONT_RIGHT_WHEEL_TEL, 0},
-        Wheel{{PIN_REAR_RIGHT_WHEEL_PWM},  RotDir::POS, {PIN_REAR_RIGHT_WHEEL_SENSOR},  EncDir::POS, PIN_REAR_RIGHT_WHEEL_TEL, 0},
-        Wheel{{PIN_REAR_LEFT_WHEEL_PWM},   RotDir::NEG, {PIN_REAR_LEFT_WHEEL_SENSOR},   EncDir::NEG, PIN_REAR_LEFT_WHEEL_TEL, 0},
-        Wheel{{PIN_FRONT_LEFT_WHEEL_PWM},  RotDir::NEG, {PIN_FRONT_LEFT_WHEEL_SENSOR},  EncDir::NEG, PIN_FRONT_LEFT_WHEEL_TEL, 0}
+        Wheel{{PIN_FRONT_RIGHT_WHEEL_PWM}, RotDir::POS, {PIN_FRONT_RIGHT_WHEEL_SENSOR}, EncDir::POS, PIN_FRONT_RIGHT_WHEEL_TEL, 0},//9}, // 115
+        Wheel{{PIN_REAR_RIGHT_WHEEL_PWM},  RotDir::POS, {PIN_REAR_RIGHT_WHEEL_SENSOR},  EncDir::POS, PIN_REAR_RIGHT_WHEEL_TEL,  0},//10}, // 115
+        Wheel{{PIN_REAR_LEFT_WHEEL_PWM},   RotDir::NEG, {PIN_REAR_LEFT_WHEEL_SENSOR},   EncDir::NEG, PIN_REAR_LEFT_WHEEL_TEL,   0},//4}, // ref 101
+        Wheel{{PIN_FRONT_LEFT_WHEEL_PWM},  RotDir::NEG, {PIN_FRONT_LEFT_WHEEL_SENSOR},  EncDir::NEG, PIN_FRONT_LEFT_WHEEL_TEL,  0},//12} // 131
       } {}
     ~WheelInterface(void) = default;
 
@@ -130,14 +131,16 @@ class WheelInterface {
         };
     }
 
-    void init() {}
+    void init() {
+        for(auto& wheel : wheels) wheel.init();
+    }
 
-    void test(int id) {
+    void test(int id, float speed=0) {
         if(!id) return;
-        float s = 0.04; // 0.04
+        float s = speed; // 0.04
         switch(id) {
           case 1:
-            wheels[Leg::FR].test(id);
+            wheels[Leg::FR].test(id); //110 100
             break;
           case 2:
             wheels[Leg::RL].set_unit_speed(s);
@@ -167,6 +170,28 @@ class WheelInterface {
             for(auto& wheel : wheels) wheel.set_unit_speed(0);
             delay(6000);
             break;
+          case 4:
+            for(auto& wheel : wheels) {
+                wheel.set_unit_speed(s);
+                Serial.print(wheel.read());
+                Serial.print(" ");
+            }
+            Serial.println();
+            break;
+          case 5:
+            Serial.println("Write microseconds: ");
+            delay(5000);
+            float us = 1500;
+            us = Serial.parseInt();
+            if(us == 0) us = 1500;
+            us = constrain(us, 1000, 2000);
+            Serial.println(us);
+            s = map(us, 1000, 2000, -1., 1.);
+            Serial.println(s);
+            for(auto& wheel : wheels) {
+                wheel.set_unit_speed(s);
+            }     
+            delay(2000);       
         }
     }
 };

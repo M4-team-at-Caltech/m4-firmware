@@ -46,8 +46,10 @@ void setup() {
     Serial.println("Setup");
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
+    delay(5000);
     robot.init_hardware();
-    delay(10000);
+    delay(5000);
+    Serial.println("Loop");
 #else
     ros_node_teensy.initNode();
     ros_node_teensy.advertise(pub_im_alive);
@@ -68,13 +70,14 @@ void loop() {
 #ifdef DEBUG
 #include "unit_test.hpp"
     static time_t loop_time = millis();
-    if(millis() - loop_time >= M4Robot::MIN_LOOP_INTERVAL_MS) {
+    if(millis() - loop_time >= 2 * M4Robot::MIN_LOOP_INTERVAL_MS) {
         loop_time = millis();
         // robot.RoverController::test(2);
-        // robot.WheelInterface::test(3);
-        // robot.RotorInterface::test(1);
+        // robot.WheelInterface::test(4, 0.3);
+        robot.RotorInterface::test(2);
+        // Serial.println(map(0.4, 0., 30., 0, 400));
         // robot.DroneController::test(2);
-        robot.BodyInterface::test(UnitTest::IMU);
+        // robot.BodyInterface::test(UnitTest::IMU);
         // Serial.println("here");
     }
 #else

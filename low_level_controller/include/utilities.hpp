@@ -1,6 +1,8 @@
 #ifndef UTILITIES
 #define UTILITIES
 
+// #define DEBUG
+
 #include <Arduino.h>
 #include <math.h>
 
@@ -22,8 +24,8 @@ using PinVector = std::vector<Pin>;
 #include <Servo.h>
 using PwmController = Servo;
 
+constexpr int MAX_PWM = 2000;
 constexpr int MIN_PWM = 1000;
 constexpr int MID_PWM = 1500;
-constexpr int MAX_PWM = 2000;
 
 #endif//UTILITIES

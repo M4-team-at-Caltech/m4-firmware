@@ -3,10 +3,9 @@
 #include "robot.hpp"
 
 void M4Robot::init_hardware(void) {    
-    BodyInterface::init();
+    // BodyInterface::init();
     RotorInterface::init();
     WheelInterface::init();
-    Serial.println("Wheels done");
     
     attachInterrupt(PIN_REBOOT, _reboot_Teensyduino_, RISING); 
 }
@@ -22,12 +21,15 @@ void M4Robot::init_controller(void) {
 
     switch(mode) {
       case Mobility::ROVER:
+        // transform(Mobility::ROVER);
         RoverController::init();
         break;
       case Mobility::DRONE:
+        // transform(Mobility::DRONE);
         DroneController::init();
         break;
       case Mobility::SEGWAY:
+        // transform(Mobility::SEGWAY);
         SegwayController::init();
         break;
     }
@@ -80,8 +82,8 @@ void M4Robot::stop_operations(void) {
       case Mobility::SEGWAY:
         SegwayController::stop();
         break;
-      default:
-        WheelInterface::set_unit_speed(0, 0, 0, 0);
+      default:;
+        // WheelInterface::set_unit_speed(0, 0, 0, 0);
     }
 
     assign_pilot(Authority::NONE);
@@ -104,12 +106,12 @@ auto M4Robot::execute_command(uint8_t command) -> uint8_t {
         init_controller();
         break;
       case Command::WHEEL_IN:{
-        float t = 1;
-        WheelInterface::set_unit_speed(-t, -t, t, t);
+        // float t = 1;
+        // WheelInterface::set_unit_speed(-t, -t, t, t);
         break;}
       case Command::WHEEL_OUT:{
-        float s = 1;
-        WheelInterface::set_unit_speed(s, s, -s, -s);
+        // float s = 1;
+        // WheelInterface::set_unit_speed(s, s, -s, -s);
         break;}
       case Command::STOP:
         stop_operations();

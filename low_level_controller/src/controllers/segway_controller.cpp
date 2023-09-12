@@ -10,9 +10,7 @@ void SegwayController::test(int id) {
 
 void SegwayController::init(void) {
     WheelInterface::enable_motors();
-
-    RotorInterface::set_signal_source(RotorSignalSource::TEENSY);
-    RotorInterface::enable_rotors();
+    RotorInterface::takeover_rotor_control();
 }
 
 void SegwayController::update() {
