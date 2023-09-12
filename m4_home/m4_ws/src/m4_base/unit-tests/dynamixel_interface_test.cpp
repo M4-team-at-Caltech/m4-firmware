@@ -28,16 +28,15 @@ atomic<bool> stopFlag(false);
 
 void send_command_looped(DynamixelPositionInterface *dxl,vector<int> id_list)
 {
-
 	while (!stopFlag)
 	{	
-		// FL
-		vector<float> goal_positions1 = {0, 90, 0, 90}; 
-		dxl->write_position(id_list, goal_positions1);
-		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-		vector<float> goal_positions2 = {0, 0, 0, 0}; 
-		dxl->write_position(id_list, goal_positions2);
-		std::this_thread::sleep_for(std::chrono::milliseconds(5000));		
+		float p1=0, p2=0;
+
+		cout << "Enter positions: ";
+		cin >> p1 >> p2;
+
+		vector<float> goal_positions = {p1, p2}; 
+		dxl->write_position(id_list, goal_positions);
     }
 }
 
@@ -48,7 +47,7 @@ int main(int argc, char *argv[])
 	// Baudrate is set using the Dynamixel Wizard on the Dynamixel Servo directly
 	const char* port = string("/dev/U2D2").c_str();
 	int baudrate = 115200;
-	vector<int> id_list = {1, 2, 3, 4};	
+	vector<int> id_list = {5,6};	
 	
     // Create a DynamixelInterface object
 	DynamixelPositionInterface dxl(port, baudrate, id_list);
