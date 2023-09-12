@@ -30,7 +30,10 @@ M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_
 	crouch1_configuration = get_active_joint_positions(config["config_crouch1"].as<std::vector<float>>());
 	crouch2_configuration = get_active_joint_positions(config["config_crouch2"].as<std::vector<float>>());
 	sit_configuration = get_active_joint_positions(config["config_sit"].as<std::vector<float>>());
-	uav_configuration = get_active_joint_positions(config["config_uav"].as<std::vector<float>>());
+	uav_step1_configuration = get_active_joint_positions(config["config_uav_step1"].as<std::vector<float>>());
+	uav_step2_configuration = get_active_joint_positions(config["config_uav_step2"].as<std::vector<float>>());
+	uav_step3_configuration = get_active_joint_positions(config["config_uav_step3"].as<std::vector<float>>());
+	uav_step4_configuration = get_active_joint_positions(config["config_uav_step4"].as<std::vector<float>>());
 	mip_configuration = get_active_joint_positions(config["config_mip"].as<std::vector<float>>());
 
 	dxl.init(interface_port.c_str(), baudrate, active_joint_ids);
@@ -58,7 +61,7 @@ void M4Base::control_loop()
 	double dt, sleep_for;
 
 	M4Commands next_cmd;
-	std::vector<std::string> commands = {"STAND", "CROUCH", "SIT", "UAV", "MIP", "CUSTOM"};
+	std::vector<std::string> commands = {"STAND", "CROUCH1", "CROUCH2", "SIT", "UAV", "MIP"};
 	bool command_active = false;
 	int command_step = 0;
 
@@ -146,27 +149,52 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 		// ---------------------------------------------------------
 		// Transformation from UAV to STANDING
 		// ---------------------------------------------------------
-		case M4Configurations::UAV:
 		case M4Configurations::MIP:
-			// Step 1: Move to sit
+			break;
+		case M4Configurations::UAV:
+			// Step 1: Move to uav step3 position
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_position(active_joint_ids, sit_configuration);
+				dxl.write_position(active_joint_ids, uav_step3_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
 
-			// Step 2: Move to stand
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+			// Step 2: Move to UAV step2 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 			{
 				command_step = 2;
+				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 3: Move to UAV step1 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			{
+				command_step = 3;
+				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 4: Move to sit position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 3)
+			{
+				command_step = 4;
+				dxl.write_position(active_joint_ids, sit_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 5: Move to stand
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 4)
+			{
+				command_step = 5;
 				dxl.write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
 			// Complete
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 5)
 			{
 				printf("[INFO] Stand Transformation complete!\n");
 				command_step = 0;
@@ -210,28 +238,53 @@ void M4Base::execute_crouch1(int& command_step, bool& command_active, std::chron
 
 			break;
 
-		case M4Configurations::UAV:
 		case M4Configurations::MIP:
-			// Step 1: Move to sit position
+			break;
+		case M4Configurations::UAV:
+			// Step 1: Move to uav step3 position
 			if(command_step == 0)
 			{
-				dxl.write_position(active_joint_ids, sit_configuration);
-				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
+				dxl.write_position(active_joint_ids, uav_step3_configuration);
+				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
 
+			// Step 2: Move to UAV step2 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
+			{
+				command_step = 2;
+				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 3: Move to UAV step1 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			{
+				command_step = 3;
+				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 4: Move to sit position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 3)
+			{
+				command_step = 4;
+				dxl.write_position(active_joint_ids, sit_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
 			// Step 1: Move to crouch1 position
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 4)
 			{
 				dxl.write_position(active_joint_ids, crouch1_configuration);
 				gait_start = std::chrono::system_clock::now();
-				command_step = 2;
+				command_step = 5;
 				command_active = true;
 			}
 
 			// Complete
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 5)
 			{
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
@@ -276,28 +329,53 @@ void M4Base::execute_crouch2(int& command_step, bool& command_active, std::chron
 
 			break;
 
-		case M4Configurations::UAV:
 		case M4Configurations::MIP:
-			// Step 1: Move to sit position
+			break;
+		case M4Configurations::UAV:
+			// Step 1: Move to uav step3 position
 			if(command_step == 0)
 			{
-				dxl.write_position(active_joint_ids, sit_configuration);
-				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
+				dxl.write_position(active_joint_ids, uav_step3_configuration);
+				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
 
+			// Step 2: Move to UAV step2 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
+			{
+				command_step = 2;
+				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 3: Move to UAV step1 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			{
+				command_step = 3;
+				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 4: Move to sit position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 3)
+			{
+				command_step = 4;
+				dxl.write_position(active_joint_ids, sit_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
 			// Step 1: Move to crouch2 position
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 4)
 			{
 				dxl.write_position(active_joint_ids, crouch2_configuration);
 				gait_start = std::chrono::system_clock::now();
-				command_step = 2;
+				command_step = 5;
 				command_active = true;
 			}
 
 			// Complete
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 5)
 			{
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
@@ -317,10 +395,10 @@ void M4Base::execute_sit(int& command_step, bool& command_active, std::chrono::_
 			command_step = 0;
 			command_active = false;
 			return;
+		case M4Configurations::INIT:
 		case M4Configurations::STAND:
 		case M4Configurations::CROUCH1:
 		case M4Configurations::CROUCH2:
-		case M4Configurations::UAV:
 		case M4Configurations::MIP:
 			// Step 1: Move to sit position
 			if(command_step == 0)
@@ -341,6 +419,49 @@ void M4Base::execute_sit(int& command_step, bool& command_active, std::chrono::_
 			}
 
 			break;
+
+		case M4Configurations::UAV:
+			// Step 1: Move to uav step3 position
+			if(command_step == 0)
+			{
+				command_step = 1;
+				dxl.write_position(active_joint_ids, uav_step3_configuration);
+				gait_start = std::chrono::system_clock::now();
+				command_active = true;
+			}
+
+			// Step 2: Move to UAV step2 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
+			{
+				command_step = 2;
+				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 3: Move to UAV step1 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			{
+				command_step = 3;
+				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 4: Move to sit position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 3)
+			{
+				command_step = 4;
+				dxl.write_position(active_joint_ids, sit_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Complete
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 4)
+			{
+				printf("[INFO] SIT Transformation complete!\n");
+				command_step = 0;
+				command_active = false;
+				current_configuration = M4Configurations::SIT;
+			}
 	}
 }
 
@@ -356,6 +477,7 @@ void M4Base::execute_uav(int& command_step, bool& command_active, std::chrono::_
 		case M4Configurations::CROUCH1:
 		case M4Configurations::CROUCH2:
 		case M4Configurations::STAND:
+		case M4Configurations::SIT:
 			// Step 1: Move to sit position
 			if(command_step == 0)
 			{
@@ -365,36 +487,40 @@ void M4Base::execute_uav(int& command_step, bool& command_active, std::chrono::_
 				command_active = true;
 			}
 
-			// Step 2: Move to UAV position
+			// Step 2: Move to UAV step1 position
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 			{
 				command_step = 2;
-				dxl.write_position(active_joint_ids, uav_configuration);
+				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 3: Move to UAV step2 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			{
+				command_step = 3;
+				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 3: Move to UAV step3 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 3)
+			{
+				command_step = 4;
+				dxl.write_position(active_joint_ids, uav_step3_configuration);
+				gait_start = std::chrono::system_clock::now();
+			}
+
+			// Step 4: Move to UAV step4 position
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 4)
+			{
+				command_step = 5;
+				dxl.write_position(active_joint_ids, uav_step4_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
 			// Complete
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 2)
-			{
-				printf("[INFO] UAV Transformation complete!\n");
-				command_step = 0;
-				command_active = false;
-				current_configuration = M4Configurations::UAV;
-			}
-
-			break;
-
-		case M4Configurations::SIT:
-			// Step 1: Move to UAV position
-			if(command_step == 0)
-			{
-				command_step = 1;
-				dxl.write_position(active_joint_ids, uav_configuration);
-				gait_start = std::chrono::system_clock::now();
-			}
-
-			// Complete
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 5)
 			{
 				printf("[INFO] UAV Transformation complete!\n");
 				command_step = 0;
@@ -417,6 +543,7 @@ void M4Base::execute_mip(int& command_step, bool& command_active, std::chrono::_
 		case M4Configurations::CROUCH1:
 		case M4Configurations::CROUCH2:
 		case M4Configurations::STAND:
+		case M4Configurations::SIT:
 			// Step 1: Move to sit position
 			if(command_step == 0)
 			{
@@ -436,26 +563,6 @@ void M4Base::execute_mip(int& command_step, bool& command_active, std::chrono::_
 
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 2)
-			{
-				printf("[INFO] MIP Transformation complete!\n");
-				command_step = 0;
-				command_active = false;
-				current_configuration = M4Configurations::MIP;
-			}
-
-			break;
-
-		case M4Configurations::SIT:
-			// Step 1: Move to MIP position
-			if(command_step == 0)
-			{
-				command_step = 1;
-				dxl.write_position(active_joint_ids, mip_configuration);
-				gait_start = std::chrono::system_clock::now();
-			}
-
-			// Complete
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
 			{
 				printf("[INFO] MIP Transformation complete!\n");
 				command_step = 0;

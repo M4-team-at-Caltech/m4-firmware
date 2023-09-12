@@ -67,7 +67,10 @@ class M4Base
 		std::vector<float> crouch1_configuration;
 		std::vector<float> crouch2_configuration;
 		std::vector<float> sit_configuration;
-		std::vector<float> uav_configuration;
+		std::vector<float> uav_step1_configuration;
+		std::vector<float> uav_step2_configuration;
+		std::vector<float> uav_step3_configuration;
+		std::vector<float> uav_step4_configuration;
 		std::vector<float> mip_configuration;
 		std::vector<std::vector<float>> transform_stand_to_crouch;
 		std::vector<std::vector<float>> transform_stand_to_sit;

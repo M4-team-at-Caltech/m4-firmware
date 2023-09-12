@@ -101,9 +101,9 @@ enum TeensyCmd
 	POSE_RECEIVED,
     TWIST_ACK,
 
-	TRANSFORM_ROVER=3,
-	TRANSFORM_UAV=4,
-	TRANSFORM_MIP=5,
+	TRANSFORM_ROVER=2,
+	TRANSFORM_UAV=3,
+	TRANSFORM_MIP=4,
 
 	WHEEL_IN=100,
     WHEEL_OUT=101,
@@ -277,8 +277,10 @@ int main(int argc, char **argv)
 	std::vector<int> active_joint_ids = {1, 2, 3, 4, 5, 6, 7, 8};
 	M4Base m4(active_joint_ids, true);
 
-	// sit();
+	m4.sit();
+	while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	m4.stand();
+	while(m4.get_current_configuration() != M4Configurations::STAND) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
 	ros::Rate loop_rate(200);
 
@@ -600,4 +602,7 @@ int main(int argc, char **argv)
 		ros::spinOnce();
 	}
 	
+	m4.sit();
+	while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
 }
