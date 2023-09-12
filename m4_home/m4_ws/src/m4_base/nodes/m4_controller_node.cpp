@@ -101,6 +101,10 @@ enum TeensyCmd
 	POSE_RECEIVED,
     TWIST_ACK,
 
+	TRANSFORM_ROVER=3,
+	TRANSFORM_UAV=4,
+	TRANSFORM_MIP=5,
+
 	WHEEL_IN=100,
     WHEEL_OUT=101,
 	DRIVE=102,
@@ -344,6 +348,8 @@ int main(int argc, char **argv)
 									
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_ROVER);
+									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
 
 									drive_mode = true;
@@ -379,6 +385,8 @@ int main(int argc, char **argv)
 
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_ROVER);
+									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
 
 									drive_mode = true;
@@ -411,6 +419,8 @@ int main(int argc, char **argv)
 									m4.crouch2();
 
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_ROVER);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
 
@@ -459,6 +469,8 @@ int main(int argc, char **argv)
 									m4.mip();
 
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_MIP);
 								}
 
 								break;
@@ -478,6 +490,8 @@ int main(int argc, char **argv)
 									m4.mip();
 
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_MIP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::MIP_BALANCE);
 								}
@@ -520,6 +534,8 @@ int main(int argc, char **argv)
 									
 									ROS_WARN("Move to uav\n");
 									m4.uav();
+									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_UAV);
 								}
 
 								break;
@@ -539,6 +555,7 @@ int main(int argc, char **argv)
 
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_UAV);
 								}
 								
 								if(teensy_cmd_flag != TeensyCmd::UAV_ENABLE)
