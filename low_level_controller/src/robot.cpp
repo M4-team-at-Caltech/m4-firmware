@@ -83,7 +83,7 @@ void M4Robot::stop_operations(void) {
         SegwayController::stop();
         break;
       default:;
-        // WheelInterface::set_unit_speed(0, 0, 0, 0);
+        WheelInterface::set_unit_speed(0, 0, 0, 0);
     }
 
     assign_pilot(Authority::NONE);
@@ -106,12 +106,14 @@ auto M4Robot::execute_command(uint8_t command) -> uint8_t {
         init_controller();
         break;
       case Command::WHEEL_IN:{
-        // float t = 1;
-        // WheelInterface::set_unit_speed(-t, -t, t, t);
+        // float t = 0.1;
+        WheelInterface::set_unit_speed(0.13, 0.13, 0.13, -0.13);
+        // WheelInterface::set_unit_speed(t, t, t, -t);
         break;}
       case Command::WHEEL_OUT:{
-        // float s = 1;
-        // WheelInterface::set_unit_speed(s, s, -s, -s);
+        WheelInterface::set_unit_speed(-0.1, -0.1,-0.13,0.1);
+
+        // WheelInterface::set_unit_speed(-s, -s, -s, s);
         break;}
       case Command::STOP:
         stop_operations();

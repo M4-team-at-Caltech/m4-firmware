@@ -1,20 +1,34 @@
 #include "controller/rover_controller.hpp"
+#include <cmath>
 
-#define MOTION_GAIN  1.00              // scaling for turning inputs
-#define TURNING_GAIN 1.00              // scaling for turning inputs
-#define WHEEL_COMMAND_DEADZONE 0.1     // deadzone around 0 speed
+#define MOTION_GAIN  0.70              // scaling for turning inputs
+#define TURNING_GAIN 0.30              // scaling for turning inputs
+#define MAX_SPEED 0.20                 // can take values up to 1.0 (limits the maximum speed)
+#define BETA 2.0
 
-
+float smooth(float x)
+ {
+  return 0.2*x + 0.8*pow(x,3);
+ }
 
 void RoverController::init(void) {
     WheelInterface::enable_motors();
 }
 
 void RoverController::update(void) {
-    float cmd_r = constrain(MOTION_GAIN * lin_vel - TURNING_GAIN * ang_vel, -1.0, 1.0);
-    float cmd_l = constrain(MOTION_GAIN * lin_vel + TURNING_GAIN * ang_vel, -1.0, 1.0);
-    
-    WheelInterface::set_unit_speed(cmd_r, cmd_r, cmd_l, cmd_l);
+    float lin_vel_smooth = smooth(lin_vel);
+    float ang_vel_smooth = smooth(ang_vel);
+
+
+    float cmd_r = MOTION_GAIN * lin_vel_smooth - TURNING_GAIN * ang_vel_smooth;
+    float cmd_l = MOTION_GAIN * lin_vel_smooth + TURNING_GAIN * ang_vel_smooth;
+
+    float cmd_rl =  constrain(cmd_l + 0.0,-MAX_SPEED,MAX_SPEED);
+    float cmd_rr =  constrain(cmd_r + 0.04,-MAX_SPEED,MAX_SPEED);
+    float cmd_fr =  constrain(cmd_r + 0.0,-MAX_SPEED,MAX_SPEED);
+    float cmd_fl =  constrain(cmd_l + 0.0,-MAX_SPEED,MAX_SPEED);
+
+    WheelInterface::set_unit_speed(-1*cmd_fr,cmd_rr,cmd_rl,cmd_fl);
 }
 
 void RoverController::stop(void) {

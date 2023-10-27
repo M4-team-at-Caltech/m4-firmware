@@ -46,7 +46,8 @@ public:
         // brake(0);
         // set_direction((uvel > 0));
         // set_dutycycle(map(abs(uvel), 0.0, 1.0, MIN_SPEED, MAX_SPEED));
-        set_unit_signal(map(uvel, -1.0, 1.0, -max_speed, max_speed));
+        // set_unit_signal(map(uvel, -1.0, 1.0, -max_speed, max_speed));
+        set_unit_signal(uvel);
         // set_unit_signal(map(abs(uvel), 0.0, 1.0, MIN_SPEED, MAX_SPEED) * sign(uvel));
     }
 
