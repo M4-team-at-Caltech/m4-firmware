@@ -13,7 +13,7 @@ The high level control code is in `m4_base` (contact Adarsh, Ioannis). There you
 The low level control code is in `low_level_controller` (contact Filip, Ioannis). There you will find the interfaces to the wheels, rotors and other hardware.
 
 # Dev Know-How
-For general questions, Filip, Adarsh, and Ioannis can help. For specific information, see the work decomposition above. Code critique is also welcome. Here are some of the main things to consider when troubleshooting:
+For general questions, Filip, Adarsh, and Ioannis can help. For specific information, see the work decomposition above. Code critique is also welcome. Here are some of the main things to consider when using the robot:
 
 * `startup.sh` is launched from /etc/rc.local which runs everytime the Nvidia Jetson Orin boots up. It launches two tmux sessions named `interface` and `control` **using sudo**. 
 If the user wishes to see the information provided from the `interfaces.launch` and the `m4_control.launch` scripts which are running in the two tmux sessions, they must call `sudo tmux a -t interface` to attach to the interface session and `sudo tmux a -t control` to attach to the control session.
