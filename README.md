@@ -19,4 +19,7 @@ For general questions, Filip, Adarsh, and Ioannis can help. For specific informa
 If the user wishes to see the information provided from the `interfaces.launch` and the `m4_control.launch` scripts which are running in the two tmux sessions, they must call `sudo tmux a -t interface` to attach to the interface session and `sudo tmux a -t control` to attach to the control session.
 Sudo is necessary every time tmux is called. For example when looking for active sessions the user must specify `sudo tmux ls`.
 
-* If you wish to re-launch the interfaces.launch script after it has been exited, you must Ctrl-C out of it, then **unplug the pixhawk from the orin** and then launch the script again.
+* To exit the control script `ssh` into the onboard computer, and run `sudo tmux send-keys -t control 'C-c'`. This should kill the m4_control.launch script, move the robot to sit configuration and switch of the servos.
+* To properly switch off the robot the user should also terminate the interfaces.launch script by running `sudo tmux send-keys -t interface 'C-c'`
+
+* If you wish to re-launch the interfaces.launch script after it has been exited, without rebooting the onboard computer, you must **unplug the pixhawk from the orin and plug it in again** before launching the script again. The control script can then be launched as normal i.e. `sudo tmux send-keys -t control 'roslaunch m4_base m4_control.launch'`
