@@ -136,13 +136,13 @@ void rc_subscriber_callback(const mavros_msgs::RCIn &rc_msg)
 	}
 
 	// MIP Channel
-	if (rc_msg.channels[mip_config.channel_id-1] == mip_config.drive) {
-		mip_channel_state = MIPMode::MODE_MIP_DISABLE;
-	} else if (rc_msg.channels[mip_config.channel_id-1] == mip_config.mip_transform) {
-		mip_channel_state = MIPMode::MODE_MIP_TRANSFORM;
-	} else if (rc_msg.channels[mip_config.channel_id-1] == mip_config.mip_ready) {
-		mip_channel_state = MIPMode::MODE_MIP_READY;
-	}
+	// if (rc_msg.channels[mip_config.channel_id-1] == mip_config.drive) {
+	// 	mip_channel_state = MIPMode::MODE_MIP_DISABLE;
+	// } else if (rc_msg.channels[mip_config.channel_id-1] == mip_config.mip_transform) {
+	// 	mip_channel_state = MIPMode::MODE_MIP_TRANSFORM;
+	// } else if (rc_msg.channels[mip_config.channel_id-1] == mip_config.mip_ready) {
+	// 	mip_channel_state = MIPMode::MODE_MIP_READY;
+	// }
 
 	// UAV Channel
 	if (rc_msg.channels[uav_config.channel_id-1] == uav_config.drive) {
@@ -390,7 +390,7 @@ int main(int argc, char **argv)
 									
 									if(current_configuration == M4Configurations::STAND)
                                         teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
-                                    else if(current_configuration == M4Configurations::SIT || current_configuration == M4Configurations::CROUCH2)
+                                    else
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
 									
 									m4.crouch1();
@@ -419,14 +419,17 @@ int main(int argc, char **argv)
 									break;
 								}
 
-								else // Move to sit configuration
+								else // Move to crouch2 configuration
 								{
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-									ROS_WARN("Move to sit");
+									ROS_WARN("Move to crouch2");
 
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
+									if(current_configuration == M4Configurations::STAND || current_configuration == M4Configurations::CROUCH1)
+                                        teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
+                                    else
+										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
 
 									m4.crouch2();
 
@@ -468,22 +471,23 @@ int main(int argc, char **argv)
 									break;
 								}
 
-								else // Move to mip configuration
-								{
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+								// else // Move to mip configuration
+								// {
+								// 	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+								// 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 									
-									ROS_WARN("Move to mip");
+								// 	ROS_WARN("Move to mip");
 									
-									if(current_configuration != M4Configurations::CROUCH2)
-										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
+								// 	if(current_configuration == M4Configurations::STAND || current_configuration == M4Configurations::CROUCH1 || current_configuration == M4Configurations::CROUCH2 )
+								// 		teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 
-									m4.mip();
 
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_MIP);
-								}
+								// 	m4.mip();
+
+								// 	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+								// 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+								// 	teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_MIP);
+								// }
 
 								break;
 
@@ -496,7 +500,7 @@ int main(int argc, char **argv)
 									
 									ROS_WARN("Move to mip");
 									
-									if(current_configuration != M4Configurations::CROUCH2)
+									if(current_configuration == M4Configurations::STAND || current_configuration == M4Configurations::CROUCH1 || current_configuration == M4Configurations::CROUCH2 )
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 
 									m4.mip();
@@ -543,9 +547,14 @@ int main(int argc, char **argv)
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									drive_mode = false;
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+									if(current_configuration == M4Configurations::STAND || current_configuration == M4Configurations::CROUCH1 || current_configuration == M4Configurations::CROUCH2 )
+										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 									
 									ROS_WARN("Move to uav\n");
 									m4.uav();
+
+									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_UAV);
 								}
@@ -560,7 +569,7 @@ int main(int argc, char **argv)
 
 									ROS_WARN("Move to uav\n");
 
-									if(current_configuration != M4Configurations::CROUCH2)
+									if(current_configuration == M4Configurations::STAND || current_configuration == M4Configurations::CROUCH1 || current_configuration == M4Configurations::CROUCH2 )
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 
 									m4.uav();
@@ -615,12 +624,12 @@ int main(int argc, char **argv)
 	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
 	
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);	
+	// teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
+	// teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+	// teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);	
 	m4.sit();
 	while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+	// teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 
 }
 
