@@ -2,10 +2,6 @@
 The `startup.sh` script will automatically run the various interfaces needed to control the robot.
 Once the boot is complete the LED indicator lights up to indicate that the robot is operational and can be controlled via remote control.
 
-Note: `startup.sh` is launched from /etc/rc.local which runs everytime the Nvidia Jetson Orin boots up. It launches two tmux sessions named `interface` and `control` **using sudo**. 
-If the user wishes to see the information provided from the `interfaces.launch` and the `m4_control.launch` scripts which are running in the two tmux sessions, they must call `sudo tmux a -t interface` to attach to the interface session and `sudo tmux a -t control` to attach to the control session.
-Sudo is necessary every time tmux is called. For example when looking for active sessions the user must specify `sudo tmux ls`.
-
 # Concepts
 The robot is operated by a master **Jetson Orin** (decision making) connected to **Cube Orange** (flight control), **Teensy 4.1** (drive wheel/rotor control), and **U2D2** (transform servo control) slaves. It is also equipped with additional sensors for later applications (see [user manual](docs/manual.pdf) for a list of components).
 
@@ -17,6 +13,10 @@ The high level control code is in `m4_base` (contact Adarsh, Ioannis). There you
 The low level control code is in `low_level_controller` (contact Filip, Ioannis). There you will find the interfaces to the wheels, rotors and other hardware.
 
 # Dev Know-How
-% TODO
+For general questions, Filip, Adarsh, and Ioannis can help. For specific information, see the work decomposition above. Code critique is also welcome. Here are some of the main things to consider when troubleshooting:
 
-For general questions, Filip, Adarsh, and Ioannis can help. For specific information, see the work decomposition above. Code critique is also welcome.
+* `startup.sh` is launched from /etc/rc.local which runs everytime the Nvidia Jetson Orin boots up. It launches two tmux sessions named `interface` and `control` **using sudo**. 
+If the user wishes to see the information provided from the `interfaces.launch` and the `m4_control.launch` scripts which are running in the two tmux sessions, they must call `sudo tmux a -t interface` to attach to the interface session and `sudo tmux a -t control` to attach to the control session.
+Sudo is necessary every time tmux is called. For example when looking for active sessions the user must specify `sudo tmux ls`.
+
+* If you wish to re-launch the interfaces.launch script after it has been exited, you must Ctrl-C out of it, then **unplug the pixhawk from the orin** and then launch the script again.
