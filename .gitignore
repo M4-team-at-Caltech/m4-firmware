@@ -4,3 +4,4 @@ m4_home/m4_ws/devel
 m4_home/m4_ws/logs
 m4_home/data
 m4_home/m4_ws/.catkin_tools
+.DS_Store
