@@ -223,7 +223,6 @@ void teensy_cmd(ros::Publisher &teensy_cmd_pub, TeensyCmd cmd)
 	cmd_msg.data = cmd;
 	teensy_cmd_pub.publish(cmd_msg);
 
-
 	while(!teensy_ack)
 	{
 		ros::spinOnce();
@@ -277,10 +276,20 @@ int main(int argc, char **argv)
 	std::vector<int> active_joint_ids = {1, 2, 3, 4, 5, 6, 7, 8};
 	M4Base m4(active_joint_ids, true);
 
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 	m4.sit();
 	while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);	
 	m4.stand();
 	while(m4.get_current_configuration() != M4Configurations::STAND) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 
 	ros::Rate loop_rate(200);
 
@@ -288,6 +297,7 @@ int main(int argc, char **argv)
 
 	while (ros::ok())
 	{
+
 		if(rc_state_available)
 		{
 			ROS_WARN_ONCE("M4 Controller Active!");
@@ -380,7 +390,7 @@ int main(int argc, char **argv)
 									
 									if(current_configuration == M4Configurations::STAND)
                                         teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
-                                    else if(current_configuration == M4Configurations::SIT)
+                                    else if(current_configuration == M4Configurations::SIT || current_configuration == M4Configurations::CROUCH2)
 										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
 									
 									m4.crouch1();
@@ -601,8 +611,16 @@ int main(int argc, char **argv)
 		loop_rate.sleep();
 		ros::spinOnce();
 	}
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
 	
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);	
 	m4.sit();
 	while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 
 }
+

@@ -1,51 +1,48 @@
 #!/bin/bash
 
-# Name of the Docker image
-IMAGE_NAME="m4:ROS-Noetic"
+echo "Sourcing startup scripts"
+source /home/m4/.profile
+source /home/m4/.bashrc
 
-# Name of the Docker container
-CONTAINER_NAME="m4_ros_noetic"
+echo "Going to /home/m4/m4-firmware"
 
-# Path to the directory you want to mount inside the container
-HOST_DIRECTORY_PATH="$(pwd)/m4_home"
-CONTAINER_DIRECTORY_PATH="/home/m4"
+cd /home/m4/m4-firmware
 
-echo "Starting Docker container ${CONTAINER_NAME}"
+echo "Creating two tmux sessions (interface, control)"
 
-# 1. Start a detached tmux session and run a Docker container in it
-tmux new-session -d -s docker "docker run -it --rm --privileged --name ${CONTAINER_NAME} \
-             --network="host" \
-             -v ${HOST_DIRECTORY_PATH}:${CONTAINER_DIRECTORY_PATH} \
-             -v /etc/timezone:/etc/timezone:ro -v /etc/localtime:/etc/localtime:ro \
-	     -v /dev:/dev \
-	     --device-cgroup-rule "c 81:* rmw" \
-	     --device-cgroup-rule "c 189:* rmw" \
-             ${IMAGE_NAME} /bin/bash"
+# Start two detached (-d) tmux sessions called interface and control
+tmux new-session -d -s interface
+tmux new-session -d -s control
 
-# Give Docker a moment to properly start
-sleep 5
+echo "Starting docker on both of them"
 
-echo "Started Docker container"
+# Start docker on both of them
+tmux send-keys -t interface './run_docker.sh' Enter
 
-# 2. Run a command inside the Docker container
-# We need to find the Docker container ID first
-CONTAINER_ID=$(docker ps -q --filter "name=${CONTAINER_NAME}")
+sleep 10
 
-echo "${CONTAINER_NAME} is running with id ${CONTAINER_ID}. Starting interfaces in tmux container name=interfaces"
+tmux send-keys -t control './new_docker_terminal.sh' Enter
 
-CMD1 = "source m4_ws/devel/setup.bash && roslaunch m4_base interfaces.launch"
-tmux new-session -d -s interfaces "docker exec ${CONTAINER_ID} \"${CMD1}\""
+sleep 10
 
-# Give interface time to start
-sleep 5
+echo "Starting interfaces.launch on interface"
 
-echo "Interfaces started. Starting controller in tmux container name=controller"
+# start interfaces.launch
+tmux send-keys -t interface 'cd m4_ws' Enter
+tmux send-keys -t interface 'source devel/setup.bash' Enter
+tmux send-keys -t interface 'roslaunch m4_base interfaces.launch' Enter
 
-# 3. Start a second tmux session and run another command inside the Docker container
-CMD2 = "source m4_ws/devel/setup.bash && roslaunch m4_base m4_control.launch"
-tmux new-session -d -s controller "docker exec ${CONTAINER_ID} \"${CMD2}\""
+sleep 7
 
-# Give controller time to start
-sleep 5
+echo "Starting m4_control.launch on control"
 
-echo "Controller started"
+# start m4_control.launch
+tmux send-keys -t control 'cd m4_ws' Enter
+tmux send-keys -t control 'source devel/setup.bash' Enter
+tmux send-keys -t control 'roslaunch m4_base m4_control.launch' Enter
+
+sleep 7
+
+python3 led/on.py
+
+echo "Robot Operational !"
