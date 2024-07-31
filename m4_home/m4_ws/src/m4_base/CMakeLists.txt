@@ -223,7 +223,7 @@ ${catkin_LIBRARIES}
 )
 
 set(UNIT_TEST_SCRIPTS
-	# Stored in test-scripts/unit-tests
+	# Stored in unit-tests
 	dynamixel_interface_test
 )
 
