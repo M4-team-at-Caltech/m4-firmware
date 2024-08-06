@@ -44,12 +44,14 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	ADDR_GOAL_POSITION = config["ADDR_GOAL_POSITION"].as<int>();
 	ADDR_TORQUE_ENABLE = config["ADDR_TORQUE_ENABLE"].as<int>();
 	ADDR_MOVEMENT_SPEED = config["ADDR_MOVEMENT_SPEED"].as<int>();
+	ADDR_MOVING_STATUS = config["ADDR_MOVING_STATUS"].as<int>();
 	ADDR_PRESENT_POSITION = config["ADDR_PRESENT_POSITION"].as<int>();
 	ADDR_PRESENT_VELOCITY = config["ADDR_PRESENT_VELOCITY"].as<int>();
 	ADDR_PRESENT_CURRENT = config["ADDR_PRESENT_CURRENT"].as<int>();
 	LEN_TORQUE_ENABLE = config["LEN_TORQUE_ENABLE"].as<int>();
 	LEN_GOAL_POSITION = config["LEN_GOAL_POSITION"].as<int>();
 	LEN_MOVEMENT_SPEED = config["LEN_MOVEMENT_SPEED"].as<int>();
+	LEN_MOVING_STATUS = config["LEN_MOVING_STATUS"].as<int>();
 	LEN_PRESENT_POSITION = config["LEN_PRESENT_POSITION"].as<int>();
 	LEN_PRESENT_VELOCITY = config["LEN_PRESENT_VELOCITY"].as<int>();
 	LEN_PRESENT_CURRENT = config["LEN_PRESENT_CURRENT"].as<int>();
@@ -92,12 +94,14 @@ void DynamixelPositionInterface::init(const char* port, const int &baudrate, con
 	printf("\tADDR_TORQUE_ENABLE: %d\n", ADDR_TORQUE_ENABLE);
 	printf("\tADDR_GOAL_POSITION: %d\n", ADDR_GOAL_POSITION);
 	printf("\tADDR_MOVEMENT_SPEED: %d\n", ADDR_MOVEMENT_SPEED);
+	printf("\tADDR_MOVING_STATUS: %d\n", ADDR_MOVING_STATUS);
 	printf("\tADDR_PRESENT_POSITION: %d\n", ADDR_PRESENT_POSITION);
 	printf("\tADDR_PRESENT_VELOCITY: %d\n", ADDR_PRESENT_VELOCITY);
 	printf("\tADDR_PRESENT_CURRENT: %d\n", ADDR_PRESENT_CURRENT);
 	printf("\tLEN_TORQUE_ENABLE: %d\n", LEN_TORQUE_ENABLE);
 	printf("\tLEN_GOAL_POSITION: %d\n", LEN_GOAL_POSITION);
 	printf("\tLEN_MOVEMENT_SPEED: %d\n", LEN_MOVEMENT_SPEED);
+	printf("\tLEN_MOVING_STATUS: %d\n", LEN_MOVING_STATUS);
 	printf("\tLEN_PRESENT_POSITION: %d\n", LEN_PRESENT_POSITION);
 	printf("\tLEN_PRESENT_VELOCITY: %d\n", LEN_PRESENT_VELOCITY);
 	printf("\tLEN_PRESENT_CURRENT: %d\n", LEN_PRESENT_CURRENT);
@@ -281,13 +285,13 @@ int DynamixelPositionInterface::write_position(std::vector<int> ids, std::vector
 		// Warn if positions are out of range
 		if(positions[i] < jconfig.min_tick)
 		{
-			printf("%s[ERROR]: [set_goal_position] Position %d out of range for Joint %s%s\n", CONSOLE_MSG_ERROR, int(positions[i]), jconfig.name.c_str(), CONSOLE_DEFAULT);
+			printf("%s[WARN]: [set_goal_position] Position %d out of range for Joint %s%s\n", CONSOLE_MSG_WARN, int(positions[i]), jconfig.name.c_str(), CONSOLE_DEFAULT);
 			printf("[WARN]: Moving to min position %d instead", jconfig.min_tick);
 			positions[i] = jconfig.min_tick;
 		}
 		else if(positions[i] > jconfig.max_tick)
 		{
-			printf("%s[ERROR]: [set_goal_position] Position %d out of range for Joint %s%s\n", CONSOLE_MSG_ERROR, int(positions[i]), jconfig.name.c_str(), CONSOLE_DEFAULT);
+			printf("%s[WARN]: [set_goal_position] Position %d out of range for Joint %s%s\n", CONSOLE_MSG_WARN, int(positions[i]), jconfig.name.c_str(), CONSOLE_DEFAULT);
 			printf("[WARN]: Moving to max position %d instead\n", jconfig.max_tick);
 			positions[i] = jconfig.max_tick;
 		}

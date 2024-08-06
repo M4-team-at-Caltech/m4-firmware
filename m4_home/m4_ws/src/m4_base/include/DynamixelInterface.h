@@ -74,6 +74,7 @@ class DynamixelPositionInterface
 		int ADDR_TORQUE_ENABLE;                 // Control table address is different in Dynamixel model
 		int ADDR_GOAL_POSITION;
 		int ADDR_MOVEMENT_SPEED;
+		int ADDR_MOVING_STATUS;
 		int ADDR_PRESENT_CURRENT;
 		int ADDR_PRESENT_VELOCITY;
 		int ADDR_PRESENT_POSITION;
@@ -81,6 +82,7 @@ class DynamixelPositionInterface
 		int LEN_TORQUE_ENABLE;
 		int LEN_GOAL_POSITION;
 		int LEN_MOVEMENT_SPEED;
+		int LEN_MOVING_STATUS;
 		int LEN_PRESENT_POSITION;
 		int LEN_PRESENT_VELOCITY;
 		int LEN_PRESENT_CURRENT;
@@ -105,6 +107,7 @@ class DynamixelPositionInterface
 		dynamixel::GroupSyncWrite *groupSyncWritePosition;
 		dynamixel::GroupSyncWrite *groupSyncWriteMoveSpeed;
 		dynamixel::GroupSyncRead *groupSyncRead;
+		dynamixel::GroupSyncRead *groupSyncReadMoveStatus;
 		
 		// Motor IDs being managed
 		std::vector<int> active_joint_ids;

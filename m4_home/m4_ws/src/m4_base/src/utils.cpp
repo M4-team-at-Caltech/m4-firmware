@@ -22,7 +22,7 @@ bool is_directory(const char* path)
 	struct stat info;
 
 	if(stat(path, &info) != 0)
-		printf( "%s[ERROR] Cannot access %s\n", CONSOLE_MSG_ERROR, path);
+		printf( "%s[WARN] Cannot access %s\n", CONSOLE_MSG_WARN, path);
 	else if(info.st_mode & S_IFDIR)
 		return true;
 	

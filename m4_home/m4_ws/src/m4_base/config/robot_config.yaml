@@ -1,10 +1,10 @@
 interface_port: "/dev/U2D2"
-baudrate: 115200
+baudrate: 4500000
 
 log_path: "/home/m4/data"
-log_buffer_size: 1000
+log_buffer_size: 4000
 
-control_loop_rate: 200
+control_loop_rate: 500
 
 # List of All joint ids defined below. Acive joint ids defined in executables
 all_joint_ids: [1, 2, 3, 4, 5, 6, 7, 8]
@@ -56,15 +56,15 @@ joints:
     BL_Frontal:
          # Reverse drive mode - CW = +ve, CCW = -ve
         id: 5              # Dynamixel motor ID
-        zero_tick: 1013    # Encoder tick corresponding to zero degrees position
-        min_tick: 1013     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2080     # max_tick = max_position_degrees / 0.087891
-        speed: 27.27          # degrees per second
+        zero_tick: 1030    # Encoder tick corresponding to zero degrees position
+        min_tick: 1030     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 2036     # max_tick = max_position_degrees / 0.087891
+        speed: 27.27       # degrees per second
     BL_Saggital:
         id: 6              # Dynamixel motor ID
-        zero_tick: 1000     # Encoder tick corresponding to zero degrees position
-        min_tick: 792      # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2255     # max_tick = max_position_degrees / 0.087891 + zero_tick
+        zero_tick: 780     # Encoder tick corresponding to zero degrees position
+        min_tick: 500      # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 2000     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
 
     # BR Leg

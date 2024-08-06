@@ -6,6 +6,7 @@
 #include <thread>
 #include "DynamixelInterface.h"
 #include "Logger.h"
+#include <mutex>
 
 enum M4Commands
 {
@@ -61,6 +62,7 @@ class M4Base
 		DynamixelPositionInterface dxl;
 		
 		std::vector<RobotState> robot_state;
+		std::mutex m_state;
 		M4Configurations current_configuration;
 
 		std::vector<float> stand_configuration;

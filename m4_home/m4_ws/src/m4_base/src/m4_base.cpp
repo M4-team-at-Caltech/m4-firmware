@@ -67,6 +67,11 @@ void M4Base::control_loop()
 
     while(!quit)
     {
+		if(!log_status && robot_state.size() >= LOG_BUFFER_SIZE)
+		{
+			robot_state.clear();
+			state_updated = false;
+		}
 
 		update_state();
 
@@ -106,10 +111,9 @@ void M4Base::control_loop()
 		t1 = std::chrono::system_clock::now();
 		dt = get_duration_secs(t0, t1);
 		sleep_for = (1.0/CONTROL_LOOP_RATE - dt) * 1.0e3;
-		if(sleep_for < 0)
-			sleep_for += 1.0e3/CONTROL_LOOP_RATE;
+		sleep_for = std::max(sleep_for,0.0);
 		std::this_thread::sleep_for(std::chrono::milliseconds(int(sleep_for)));	
-		t0 = t1;
+		t0 = std::chrono::system_clock::now();
 
     }
 }
@@ -614,41 +618,49 @@ void M4Base::log_status_loop()
 	printf("%s[INFO] Logging loop...\n", CONSOLE_MSG_INFO);
 	int sleep_time = int((LOG_BUFFER_SIZE/CONTROL_LOOP_RATE) * 1000);
 	while(log_status && !quit)
-	{
+	{		
 		if(robot_state.size() >= LOG_BUFFER_SIZE)
 		{
+			printf("%s[INFO] Logging buffer...\n", CONSOLE_MSG_INFO);
 			std::vector<std::vector<float>> data_position;
 			std::vector<std::vector<float>> data_velocity;
 			std::vector<std::vector<float>> data_current;
 
-			for(int i = 0; i < robot_state.size(); i++)
+			{// MUTEX LOCK
+				std::lock_guard<std::mutex> lock(m_state);
+				for(int i = 0; i < robot_state.size(); i++)
 				{
-				std::vector<float> q = robot_state[i].positions;
-				q.insert(q.begin(), robot_state[i].timestamp);
-				data_position.push_back(q);
-			
-				std::vector<float> qdot = robot_state[i].velocities;
-				qdot.insert(qdot.begin(), robot_state[i].timestamp);
-				data_velocity.push_back(qdot);
-			
-				std::vector<float> current = robot_state[i].currents;
-				current.insert(current.begin(), robot_state[i].timestamp);
-				data_current.push_back(current);
-			}
+					std::vector<float> q = robot_state[i].positions;
+					q.insert(q.begin(), robot_state[i].timestamp);
+					data_position.push_back(q);
+				
+					std::vector<float> qdot = robot_state[i].velocities;
+					qdot.insert(qdot.begin(), robot_state[i].timestamp);
+					data_velocity.push_back(qdot);
+				
+					std::vector<float> current = robot_state[i].currents;
+					current.insert(current.begin(), robot_state[i].timestamp);
+					data_current.push_back(current);
+				}
+			}// MUTEX UNLOCK
 
 			position_logger->log_batch_entry(data_position);
 			velocity_logger->log_batch_entry(data_velocity);
 			current_logger->log_batch_entry(data_current);
 			
-			robot_state.clear();
+			{// MUTEX LOCK
+				std::lock_guard<std::mutex> lock(m_state);
+				robot_state.clear();
+			}// MUTEX UNLOCK
+
 			state_updated = false;
 		}
-
 		std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
 	}
 
 	// Save the remaining data from buffer into file before stopping logging thread
 	printf("[INFO] Finishing logging...\n");
+	
 	if(!robot_state.empty())
 	{
 		printf("[INFO] Saving remaining buffer...\n");
@@ -674,9 +686,12 @@ void M4Base::log_status_loop()
 		position_logger->log_batch_entry(data_position);
 		velocity_logger->log_batch_entry(data_velocity);
 		current_logger->log_batch_entry(data_current);
+		{
+			std::lock_guard<std::mutex> lock(m_state);
+			robot_state.clear();
+			state_updated = false;
+		}
 		
-		robot_state.clear();
-		state_updated = false;
 	}
 }
 
@@ -688,7 +703,12 @@ void M4Base::update_state()
 	r.positions = status.position;
 	r.velocities = status.velocity;
 	r.currents = status.current;
-	robot_state.push_back(r);
+	
+	{// MUTEX LOCK
+		std::lock_guard<std::mutex> lock(m_state);
+		robot_state.push_back(r);
+	}// MUTEX UNLOCK
+	
 	state_updated = true;
 }
 
