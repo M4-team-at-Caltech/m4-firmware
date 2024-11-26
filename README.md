@@ -8,7 +8,7 @@ Once the boot is complete the LED indicator lights up (if the LED is properly co
 # Concepts
 The robot is operated by a master **Jetson Orin** (decision making) connected to **Cube Orange** (flight control), **Teensy 4.1** (drive wheel/rotor control), and **U2D2** (transform servo control) slaves. It is also equipped with additional sensors for later applications (see [user manual](docs/manual.pdf) for a list of components).
 
-The [software architecture](docs/architecture.pdf) gets user inputs from a remote control and translates them into commands distributed via ROS. The slaves are left to operate freely towards execution of the commands, feedback is only sent upon acceptance or safe completion.
+The software architecture relies on getting user inputs from a remote control and translating them into commands distributed via ROS. The slaves are left to operate freely towards execution of the commands, feedback is only sent upon acceptance or safe completion.
 
 # Decomposition
 The high level control code is in `m4_base` (contact Adarsh, Ioannis). There you will find the interfaces to ROS packages and Dynamixels.
