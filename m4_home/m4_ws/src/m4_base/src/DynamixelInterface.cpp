@@ -152,6 +152,20 @@ void DynamixelInterface::init(const char* port, const int &baudrate, const std::
 			joint_configs[i].max_tick,
 			joint_configs[i].speed);
 	}
+	printf("\n%sWheel configurations:\n%s", CONSOLE_GREEN, CONSOLE_DEFAULT);
+	for(int i=0; i < wheel_configs.size(); i++)
+	{
+		printf("\t%s:\n",wheel_configs[i].name.c_str());
+		printf("\t\tID: %d\n\t\tmin_speed: %d\n\t\tmax_speed: %d\n\n",
+			wheel_configs[i].id,
+			wheel_configs[i].min_speed,
+			wheel_configs[i].max_speed);
+	}
+
+	std::vector<std::string> servo_names;
+	servo_names.reserve(active_joint_names.size() + active_wheel_names.size());
+	servo_names.insert(servo_names.end(), active_joint_names.begin(), active_joint_names.end());
+	servo_names.insert(servo_names.end(), active_wheel_names.begin(), active_wheel_names.end());
 	
 	//---------------------------------------------------------------------------------------------------------------
 
@@ -349,8 +363,23 @@ DynamixelStatus DynamixelInterface::read_status()
 		status.velocity[i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY), LEN_PRESENT_VELOCITY);
 		status.current[i] = MULT_CURRENT * short(twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT), LEN_PRESENT_CURRENT));
 	}
+
+	for(int i = 0; i < active_wheel_ids.size(); i++)
+	{
+		 dxl_getdata_result = groupSyncRead->isAvailable(active_wheel_ids[i], read_start_address, read_data_length);
+		 if (dxl_getdata_result != true)
+		 {
+			fprintf(stderr, "[ID:%03d] groupSyncRead getdata failed\n", active_wheel_ids[i]);
+		 }
+
+		WheelConfig wheel_configs = get_wheel_config(active_wheel_ids[i]);
+
+		status.position[active_joint_ids.size() + i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION), LEN_PRESENT_POSITION) - wheel_config.zero_tick);
+		status.velocity[active_joint_ids.size() + i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY), LEN_PRESENT_VELOCITY);
+		status.current[active_joint_ids.size() + i] = MULT_CURRENT * short(twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT), LEN_PRESENT_CURRENT));
+	}
 	
-	status.joint_names = active_joint_names;
+	status.names = servo_names;
 
 	return status;
 }
