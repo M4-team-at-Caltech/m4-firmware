@@ -31,11 +31,11 @@ joints:
         speed: 27.27          # degrees per second
     FL_Saggital:           
         # Reverse drive mode - CW = +ve, CCW = -ve
-        id: 2              # Dynamixel motor ID
-        zero_tick: 1015    # Encoder tick corresponding to zero degrees position
+        id: 2             # Dynamixel motor ID
+        zero_tick: 1015   # Encoder tick corresponding to zero degrees position
         min_tick: 794     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2252     # max_tick = max_position_degrees / 0.087891 + zero_tick
-        speed: 60          # degrees per second
+        max_tick: 2252    # max_tick = max_position_degrees / 0.087891 + zero_tick
+        speed: 60         # degrees per second
     
     # FR Leg
     FR_Frontal:
@@ -80,6 +80,36 @@ joints:
         min_tick: 776      # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2242     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
+
+# List of All wheel ids defined below. Acive wheel ids defined in executables
+all_wheel_ids: [9, 10, 11, 12]
+
+# Wheel names must match wheel configurations below
+wheel_names:
+  - "FL_Wheel"
+  - "FR_Wheel"
+  - "BL_Wheel"
+  - "BR_Wheel"
+
+# Wheel configurations
+wheels:
+    FL_Wheel:           
+        id: 9             # Dynamixel motor ID
+        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374
+        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374
+    FR_Wheel:
+        id: 10            # Dynamixel motor ID
+        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374
+        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374
+    BL_Wheel:           
+        id: 11             # Dynamixel motor ID
+        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374
+        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374
+    BR_Wheel:
+        id: 12            # Dynamixel motor ID
+        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374
+        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374
+
 
 # Standard Configurations    
 config_stand: [0, 0, 0, 0, 0, 0, 0, 0]
