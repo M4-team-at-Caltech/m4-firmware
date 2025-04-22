@@ -212,8 +212,7 @@ void DynamixelInterface::init(const char* port, const int &baudrate, const std::
 	// Set the speed of each motor
 	for(int i = 0; i < active_joint_ids.size(); i++)
 	{
-		if(joint_configs[i].type == 0)
-			write_movement_speed(active_joint_ids[i], joint_configs[i].speed);
+		write_movement_speed(active_joint_ids[i], joint_configs[i].speed);
 	}
 
 	initialized = true;
@@ -378,7 +377,7 @@ DynamixelStatus DynamixelInterface::read_status()
 
 		WheelConfig wheel_configs = get_wheel_config(active_wheel_ids[i]);
 
-		status.position[active_joint_ids.size() + i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION), LEN_PRESENT_POSITION) - wheel_config.zero_tick);
+		status.position[active_joint_ids.size() + i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION), LEN_PRESENT_POSITION));
 		status.velocity[active_joint_ids.size() + i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY), LEN_PRESENT_VELOCITY);
 		status.current[active_joint_ids.size() + i] = MULT_CURRENT * short(twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT), LEN_PRESENT_CURRENT));
 	}
