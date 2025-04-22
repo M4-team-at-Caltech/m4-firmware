@@ -26,17 +26,20 @@ using namespace std;
 
 atomic<bool> stopFlag(false);
 
-void send_command_looped(DynamixelPositionInterface *dxl,vector<int> id_list)
+void send_command_looped(DynamixelPositionInterface *dxl, vector<int> id_list, vector<int> wheel_list)
 {
 	while (!stopFlag)
 	{	
-		float p1=0, p2=0;
+		float p1=0, p2=0, v1=0;
 
-		cout << "Enter positions: ";
-		cin >> p1 >> p2;
+		cout << "Enter inputs: ";
+		cin >> p1 >> p2 >> v1;
 
 		vector<float> goal_positions = {p1, p2}; 
 		dxl->write_position(id_list, goal_positions);
+		
+		vector<float> goal_velocities = {v1};
+		dxl->write_velocity(wheel_list, goal_velocities);
     }
 }
 
@@ -46,14 +49,15 @@ int main(int argc, char *argv[])
 	// Verify that the port name is correct. This can be different on your system
 	// Baudrate is set using the Dynamixel Wizard on the Dynamixel Servo directly
 	const char* port = string("/dev/U2D2").c_str();
-	int baudrate = 115200;
-	vector<int> id_list = {5,6};	
+	int baudrate = 45000000;
+	vector<int> id_list = {3,4};	
+	vector<int> wheel_list = {10};
 	
     // Create a DynamixelInterface object
-	DynamixelPositionInterface dxl(port, baudrate, id_list);
+	DynamixelPositionInterface dxl(port, baudrate, id_list, wheel_list);
 
     // Set the goal positions
-	thread cmd_thread(send_command_looped, &dxl, id_list);
+	thread cmd_thread(send_command_looped, &dxl, id_list, wheel_list);
 
 	cout << "Press q to quit" << endl;
 
