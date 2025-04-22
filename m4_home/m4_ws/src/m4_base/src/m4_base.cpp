@@ -8,7 +8,7 @@
 #define deg2rad(x) ((x)*M_PI/180.0)
 #define rad2deg(x) ((x)*180.0/M_PI)
 
-M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_ids(active_joint_ids), log_status(false), quit(false), state_updated(false), command_queue(20), current_configuration(M4Configurations::INIT)
+M4Base::M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status):active_joint_ids(active_joint_ids), active_wheel_ids(active_wheel_ids), wheel_velocity_cmd(0.0), log_status(false), quit(false), state_updated(false), command_queue(20), current_configuration(M4Configurations::INIT)
 {
 	std::string configFilePath = std::string(PROJECT_ROOT_DIR) + "/config/robot_config.yaml";
 	YAML::Node config = YAML::LoadFile(configFilePath);
@@ -24,7 +24,11 @@ M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_
 
 	all_joint_ids = config["all_joint_ids"].as<std::vector<int>>();
 	all_joint_names = config["joint_names"].as<std::vector<std::string>>();
+	all_wheel_ids = config["all_wheel_ids"].as<std::vector<int>>();
+	all_wheel_names = config["wheel_names"].as<std::vector<std::string>>();
+
 	active_joint_names = get_active_joint_names();
+	active_wheel_names = get_active_wheel_names();
 
 	stand_configuration = get_active_joint_positions(config["config_stand"].as<std::vector<float>>());
 	crouch1_configuration = get_active_joint_positions(config["config_crouch1"].as<std::vector<float>>());
@@ -36,7 +40,7 @@ M4Base::M4Base(std::vector<int> active_joint_ids, bool log_status):active_joint_
 	uav_step4_configuration = get_active_joint_positions(config["config_uav_step4"].as<std::vector<float>>());
 	mip_configuration = get_active_joint_positions(config["config_mip"].as<std::vector<float>>());
 
-	dxl.init(interface_port.c_str(), baudrate, active_joint_ids);
+	dxl.init(interface_port.c_str(), baudrate, active_joint_ids, active_wheel_ids);
 
 	control_thread = std::thread(&M4Base::control_loop, this);
     set_log_status(log_status);
@@ -74,6 +78,7 @@ void M4Base::control_loop()
 		}
 
 		update_state();
+		drive(linear_velocity_cmd, angular_velocity_cmd);
 
 		// Execute commands
 		if(!command_queue.empty() || command_active)
@@ -723,6 +728,20 @@ RobotState M4Base::get_state()
 	return robot_state.back();
 }
 
+void M4Base::drive(float linear_velocity_cmd, float angular_velocity_cmd)
+{
+	// Differential drive controller
+	float wheel_radius = 0.1; // meters
+	float wheel_base = 0.285; // meters
+	float right_wheel_velocity = (linear_velocity_cmd + angular_velocity_cmd * wheel_base / 2.0) / wheel_radius;
+	float left_wheel_velocity = (linear_velocity_cmd - angular_velocity_cmd * wheel_base / 2.0) / wheel_radius;
+	std::vector<float> wheel_velocity_list = {left_wheel_velocity, right_wheel_velocity, left_wheel_velocity, right_wheel_velocity};
+	wheel_velocity_cmd = get_active_wheel_velocities(wheel_velocity_list);
+	wheel_velocity_cmd_ids = active_wheel_ids;
+	dxl.write_velocity(wheel_velocity_cmd_ids, wheel_velocity_cmd);
+
+}
+
 void M4Base::crouch1(){
 	command_queue.push(M4Commands::CMD_CROUCH1);
 	// Wait until it completes
@@ -807,5 +826,41 @@ std::vector<std::string> M4Base::get_active_joint_names()
     }
     
     return active_joint_names;
+}
+
+std::vector<float> M4Base::get_active_wheel_velocities(const std::vector<float>& wheel_velocities) 
+{
+    std::vector<float> get_active_wheel_velocities;
+    
+    // Using a map for efficient look-up of wheel position based on wheel ID
+    std::unordered_map<int, float> wheel_id_to_velocity;
+    for (size_t i = 0; i < all_wheel_ids.size(); ++i) {
+        wheel_id_to_velocity[all_wheel_ids[i]] = wheel_velocities[i];
+    }
+    
+    // Populating the active_wheel_positions vector
+    for (int id : active_wheel_ids) {
+        get_active_wheel_velocities.push_back(wheel_id_to_velocity[id]);
+    }
+    
+    return get_active_wheel_velocities;
+}
+
+std::vector<std::string> M4Base::get_active_wheel_names() 
+{
+    std::vector<std::string> active_wheel_names;
+    
+    // Using a map for efficient look-up of	wheel name based on wheel id
+	std::unordered_map<int, std::string> wheel_id_to_name;
+    for (size_t i = 0; i < all_wheel_ids.size(); ++i) {
+        wheel_id_to_name[all_wheel_ids[i]] = all_wheel_names[i];
+    }
+    
+    // Populating the active_wheel_names vector
+    for (int id : active_wheel_ids) {
+        active_wheel_names.push_back(wheel_id_to_name[id]);
+    }
+    
+    return active_wheel_names;
 }
 
