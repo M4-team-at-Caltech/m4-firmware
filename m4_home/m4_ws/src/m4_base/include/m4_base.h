@@ -59,7 +59,7 @@ class M4Base
 		void mip();
 
 		// Wheels
-		void drive(float lin_vel, float ang_vel);
+		void drive(float lin_vel_cmd, float ang_vel_cmd);
 
 	private:
 		DynamixelInterface dxl;
@@ -123,6 +123,7 @@ class M4Base
 		std::thread control_thread;
 		void active_sleep(double sleep_time);
 
+		void execute_drive();
 		void execute_stand(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_crouch1(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_crouch2(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
@@ -133,6 +134,9 @@ class M4Base
 		std::vector<float> joint_position_cmd;
 		std::vector<int> joint_position_cmd_ids;
 		std::vector<float> wheel_velocity_cmd;
+		std::mutex drive_cmd;
+		float linear_velocity_cmd;
+		float angular_velocity_cmd;
 		std::vector<int> wheel_velocity_cmd_ids;
 
 		float movement_time;

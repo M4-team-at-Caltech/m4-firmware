@@ -78,7 +78,7 @@ void M4Base::control_loop()
 		}
 
 		update_state();
-		drive(linear_velocity_cmd, angular_velocity_cmd);
+		execute_drive();
 
 		// Execute commands
 		if(!command_queue.empty() || command_active)
@@ -728,13 +728,28 @@ RobotState M4Base::get_state()
 	return robot_state.back();
 }
 
-void M4Base::drive(float linear_velocity_cmd, float angular_velocity_cmd)
+void M4Base::drive(float lin_vel_cmd, float ang_vel_cmd)
+{
+	{// MUTEX LOCK
+		std::lock_guard<std::mutex> lock(drive_cmd);
+		linear_velocity_cmd = lin_vel_cmd;
+		angular_velocity_cmd = ang_vel_cmd;
+	}// MUTEX UNLOCK
+}
+
+void M4Base::execute_drive()
 {
 	// Differential drive controller
 	float wheel_radius = 0.1; // meters
 	float wheel_base = 0.285; // meters
-	float right_wheel_velocity = (linear_velocity_cmd + angular_velocity_cmd * wheel_base / 2.0) / wheel_radius;
-	float left_wheel_velocity = (linear_velocity_cmd - angular_velocity_cmd * wheel_base / 2.0) / wheel_radius;
+	
+	float right_wheel_velocity, left_wheel_velocity = 0;
+	{// MUTEX LOCK
+		std::lock_guard<std::mutex> lock(drive_cmd);
+		right_wheel_velocity = (linear_velocity_cmd + angular_velocity_cmd * wheel_base / 2.0) / wheel_radius;
+		left_wheel_velocity = (linear_velocity_cmd - angular_velocity_cmd * wheel_base / 2.0) / wheel_radius;
+	}// MUTEX UNLOCK
+
 	std::vector<float> wheel_velocity_list = {left_wheel_velocity, right_wheel_velocity, left_wheel_velocity, right_wheel_velocity};
 	wheel_velocity_cmd = get_active_wheel_velocities(wheel_velocity_list);
 	wheel_velocity_cmd_ids = active_wheel_ids;
