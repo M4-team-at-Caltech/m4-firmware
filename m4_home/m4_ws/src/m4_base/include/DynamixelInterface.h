@@ -60,10 +60,10 @@ class DynamixelInterface
 {
 	public:
 		DynamixelInterface();
-		DynamixelInterface(const char* port, const int &baudrate, const std::vector<int> &ids);
+		DynamixelInterface(const char* port, const int &baudrate, const std::vector<int> &joint_ids, const std::vector<int> &wheel_ids);
 		~DynamixelInterface();
 
-		void init(const char* port, const int &baudrate, const std::vector<int> &ids);
+		void init(const char* port, const int &baudrate, const std::vector<int> &joint_ids, const std::vector<int> &wheel_ids);
 
 		// Command functions
 		int write_position(std::vector<int> ids, std::vector<float> positions);

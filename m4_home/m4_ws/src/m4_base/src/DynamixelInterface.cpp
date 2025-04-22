@@ -16,21 +16,25 @@ DynamixelInterface::DynamixelInterface()
 	initialized = false;
 }
 
-DynamixelInterface::DynamixelInterface(const char* port, const int &baudrate, const std::vector<int> &ids)
+DynamixelInterface::DynamixelInterface(const char* port, const int &baudrate, const std::vector<int> &joint_ids, const std::vector<int> &wheel_ids)
 {
-	init(port, baudrate, ids);
+	init(port, baudrate, joint_ids, wheel_ids);
 }
 
-void DynamixelInterface::init(const char* port, const int &baudrate, const std::vector<int> &ids)
+void DynamixelInterface::init(const char* port, const int &baudrate, const std::vector<int> &joint_ids, const std::vector<int> &wheel_ids)
 /*
 	port: Serial port name
 	baudrate: Serial port baudrate set on Dynamixel using Dynamixel Wizard
 	ids: List of motor IDs to connect to (IDs set on Dynamixel using Dynamixel Wizard).
 */
 {
-	active_joint_ids = ids;
+	active_joint_ids = joint_ids;
+	active_wheel_ids = wheel_ids;
 	joint_configs.resize(active_joint_ids.size());
+	wheel_configs.resize(active_wheel_ids.size());
 	active_joint_names.resize(active_joint_ids.size());
+	active_wheel_names.resize(active_wheel_ids.size());
+	servo_names.resize(active_joint_ids.size() + active_wheel_ids.size());
 	
 	// Load configuration variables
 	//---------------------------------------------------------------------------------------------------------------

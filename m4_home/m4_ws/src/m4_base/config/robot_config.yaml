@@ -41,15 +41,15 @@ joints:
     FR_Frontal:
         # Reverse drive mode - CW = +ve, CCW = -ve
         id: 3              # Dynamixel motor ID
-        zero_tick: 1040    # Encoder tick corresponding to zero degrees position
-        min_tick: 1040     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2110     # max_tick = max_position_degrees / 0.087891
+        zero_tick: 919     # Encoder tick corresponding to zero degrees position
+        min_tick: 919      # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 1919     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     FR_Saggital:
         id: 4              # Dynamixel motor ID
-        zero_tick: 1135    # Encoder tick corresponding to zero degrees position
-        min_tick: 922      # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2380     # max_tick = max_position_degrees / 0.087891 + zero_tick
+        zero_tick: 796     # Encoder tick corresponding to zero degrees position
+        min_tick: 795      # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 1843     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
 
     # BL Leg
