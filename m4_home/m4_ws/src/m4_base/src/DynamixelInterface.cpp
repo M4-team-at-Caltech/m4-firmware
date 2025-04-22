@@ -165,8 +165,6 @@ void DynamixelInterface::init(const char* port, const int &baudrate, const std::
 			wheel_configs[i].max_speed);
 	}
 
-	std::vector<std::string> servo_names;
-	servo_names.reserve(active_joint_names.size() + active_wheel_names.size());
 	servo_names.insert(servo_names.end(), active_joint_names.begin(), active_joint_names.end());
 	servo_names.insert(servo_names.end(), active_wheel_names.begin(), active_wheel_names.end());
 	

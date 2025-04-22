@@ -1,10 +1,10 @@
 interface_port: "/dev/U2D2"
-baudrate: 4500000
+baudrate: 2000000
 
 log_path: "/home/m4/data"
 log_buffer_size: 4000
 
-control_loop_rate: 500
+control_loop_rate: 200
 
 # List of All joint ids defined below. Acive joint ids defined in executables
 all_joint_ids: [1, 2, 3, 4, 5, 6, 7, 8]
@@ -25,16 +25,16 @@ joints:
     # FL Leg
     FL_Frontal:
         id: 1              # Dynamixel motor ID
-        zero_tick: 1028    # Encoder tick corresponding to zero degrees position
-        min_tick: 1028     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2110     # max_tick = max_position_degrees / 0.087891
+        zero_tick: 316     # Encoder tick corresponding to zero degrees position
+        min_tick: 316      # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 1317     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     FL_Saggital:           
         # Reverse drive mode - CW = +ve, CCW = -ve
         id: 2             # Dynamixel motor ID
-        zero_tick: 1015   # Encoder tick corresponding to zero degrees position
-        min_tick: 794     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2252    # max_tick = max_position_degrees / 0.087891 + zero_tick
+        zero_tick: 2615   # Encoder tick corresponding to zero degrees position
+        min_tick: 2615    # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 3770    # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60         # degrees per second
     
     # FR Leg
@@ -43,42 +43,42 @@ joints:
         id: 3              # Dynamixel motor ID
         zero_tick: 919     # Encoder tick corresponding to zero degrees position
         min_tick: 919      # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 1919     # max_tick = max_position_degrees / 0.087891
+        max_tick: 1940     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     FR_Saggital:
         id: 4              # Dynamixel motor ID
-        zero_tick: 796     # Encoder tick corresponding to zero degrees position
+        zero_tick: 795     # Encoder tick corresponding to zero degrees position
         min_tick: 795      # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 1843     # max_tick = max_position_degrees / 0.087891 + zero_tick
+        max_tick: 1845     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
 
     # BL Leg
     BL_Frontal:
          # Reverse drive mode - CW = +ve, CCW = -ve
         id: 5              # Dynamixel motor ID
-        zero_tick: 1030    # Encoder tick corresponding to zero degrees position
-        min_tick: 1030     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2036     # max_tick = max_position_degrees / 0.087891
+        zero_tick: 208     # Encoder tick corresponding to zero degrees position
+        min_tick: 208      # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 1171     # max_tick = max_position_degrees / 0.087891
         speed: 27.27       # degrees per second
     BL_Saggital:
         id: 6              # Dynamixel motor ID
-        zero_tick: 780     # Encoder tick corresponding to zero degrees position
-        min_tick: 500      # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2000     # max_tick = max_position_degrees / 0.087891 + zero_tick
+        zero_tick: 2825    # Encoder tick corresponding to zero degrees position
+        min_tick: 2825     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 3926     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
 
     # BR Leg
     BR_Frontal:
         id: 7              # Dynamixel motor ID
-        zero_tick: 2570    # Encoder tick corresponding to zero degrees position
-        min_tick: 2570     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 3600     # max_tick = max_position_degrees / 0.087891
+        zero_tick: 2255    # Encoder tick corresponding to zero degrees position
+        min_tick: 2255     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 3272     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     BR_Saggital:
         id: 8              # Dynamixel motor ID
-        zero_tick: 1015    # Encoder tick corresponding to zero degrees position
-        min_tick: 776      # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2242     # max_tick = max_position_degrees / 0.087891 + zero_tick
+        zero_tick: 2237    # Encoder tick corresponding to zero degrees position
+        min_tick: 2237     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 3266     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
 
 # List of All wheel ids defined below. Acive wheel ids defined in executables
