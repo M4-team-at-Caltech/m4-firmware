@@ -63,7 +63,6 @@ void DynamixelInterface::init(const char* port, const int &baudrate, const std::
 	LEN_PRESENT_CURRENT = config["LEN_PRESENT_CURRENT"].as<int>();
 	MULT_SPEED = config["MULT_SPEED"].as<float>();
 	MULT_POSITION = config["MULT_POSITION"].as<float>();
-	MULT_VELOCITY = config["MULT_VELOCITY"].as<float>();
 	MULT_CURRENT = config["MULT_CURRENT"].as<float>();
 	PROTOCOL_VERSION = config["PROTOCOL_VERSION"].as<float>();
 	TORQUE_ENABLE = config["TORQUE_ENABLE"].as<int>();
@@ -277,6 +276,27 @@ int DynamixelInterface::connect(const int &baudrate)
 		}
 	}
 
+	for(int i = 0; i < active_wheel_ids.size(); i++)
+	{
+		dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, active_wheel_ids[i], ADDR_TORQUE_ENABLE, TORQUE_ENABLE, &dxl_error);
+		if (dxl_comm_result != COMM_SUCCESS)
+		{
+			printf("\nUnable to connect to Dynamixel %d\n\n", active_wheel_ids[i]);
+			printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
+			return 0;
+		}
+		else if (dxl_error != 0)
+		{
+			printf("\nUnable to connect to Dynamixel %d\n\n", active_wheel_ids[i]);
+			printf("%s\n", packetHandler->getRxPacketError(dxl_error));
+			return 0;
+		}
+		else
+		{
+			printf("Dynamixel#%2d has been successfully connected \n", active_wheel_ids[i]);
+		}
+	}
+
 	running = true;
 
 	return 1;
@@ -308,6 +328,27 @@ int DynamixelInterface::disconnect()
         else
 		{
             printf("Dynamixel#%d has been successfully disconnected \n", active_joint_ids[i]);
+        }	
+	}
+
+	for(int i = 0; i < active_wheel_ids.size(); i++)
+	{
+		dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, active_wheel_ids[i], ADDR_TORQUE_ENABLE, TORQUE_DISABLE, &dxl_error);
+        if (dxl_comm_result!= COMM_SUCCESS)
+        {
+            printf("\nUnable to disconnect from Dynamixel %d\n\n", active_wheel_ids[i]);
+            printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
+            return 0;
+        }
+        else if (dxl_error!= 0)
+        {
+            printf("\nUnable to disconnect from Dynamixel %d\n\n", active_wheel_ids[i]);
+            printf("%s\n", packetHandler->getRxPacketError(dxl_error));
+            return 0;
+        }
+        else
+		{
+            printf("Dynamixel#%d has been successfully disconnected \n", active_wheel_ids[i]);
         }	
 	}
 
@@ -524,12 +565,13 @@ int DynamixelInterface::write_movement_speed(int id, float movement_speed)
 
 int DynamixelInterface::write_velocity(std::vector<int> ids, std::vector<float> velocities)
 {
+	for(int i=0;i<velocities.size();i++) printf("dps: %f ", velocities[i]);
 	if(ids.size() != velocities.size())
 	{
 		fprintf(stderr, "[set_goal_velocity] Size mismatch between list of IDs and Velocities.\n");
         return 0;
 	}
-	if(IsSubset(active_joint_ids, ids) != true)
+	if(IsSubset(active_wheel_ids, ids) != true)
 	{
 		fprintf(stderr, "[set_goal_velocity] Some motor IDs provided were not initialized.\n");
         return 0;
@@ -539,18 +581,18 @@ int DynamixelInterface::write_velocity(std::vector<int> ids, std::vector<float> 
 	for(int i = 0; i < velocities.size(); i++)
 	{
 		WheelConfig wconfig = wheel_configs[std::find(active_wheel_ids.begin(), active_wheel_ids.end(), ids[i]) - active_wheel_ids.begin()];
-		velocities[i] = velocities[i] / MULT_VELOCITY;
-		// Warn if positions are out of range
+		velocities[i] = velocities[i] / MULT_SPEED;
+		// Warn if velocities are out of range
 		if(velocities[i] < wconfig.min_speed)
 		{
 			printf("%s[WARN]: [set_goal_velocity] Velocity %d out of range for Joint %s%s\n", CONSOLE_MSG_WARN, int(velocities[i]), wconfig.name.c_str(), CONSOLE_DEFAULT);
-			printf("[WARN]: Moving to min position %d instead", wconfig.min_speed);
+			printf("[WARN]: Moving at min velocity %d instead", wconfig.min_speed);
 			velocities[i] = wconfig.min_speed;
 		}
 		else if(velocities[i] > wconfig.max_speed)
 		{
 			printf("%s[WARN]: [set_goal_velocities] Velocity %d out of range for Joint %s%s\n", CONSOLE_MSG_WARN, int(velocities[i]), wconfig.name.c_str(), CONSOLE_DEFAULT);
-			printf("[WARN]: Moving to max position %d instead\n", wconfig.max_speed);
+			printf("[WARN]: Moving at max velocity %d instead\n", wconfig.max_speed);
 			velocities[i] = wconfig.max_speed;
 		}
 		
@@ -562,14 +604,17 @@ int DynamixelInterface::write_velocity(std::vector<int> ids, std::vector<float> 
 	bool dxl_addparam_result = false;
 	uint8_t param_goal_velocity[4];
 
+	for(int i=0;i<velocities.size();i++) printf("raw: %f ", velocities[i]);
+
 	// Load goal positions to buffer
     for(int i = 0; i < ids.size(); i++)
 	{
-		param_goal_velocity[0] = DXL_LOBYTE(DXL_LOWORD(velocities[i]));
-		param_goal_velocity[1] = DXL_HIBYTE(DXL_LOWORD(velocities[i]));
-		param_goal_velocity[2] = DXL_LOBYTE(DXL_HIWORD(velocities[i]));
-		param_goal_velocity[3] = DXL_HIBYTE(DXL_HIWORD(velocities[i]));
-
+		uint32_t vel_unsigned = static_cast<int32_t>(velocities[i]) & 0xFFFFFFFF;
+		param_goal_velocity[0] = DXL_LOBYTE(DXL_LOWORD(vel_unsigned));
+		param_goal_velocity[1] = DXL_HIBYTE(DXL_LOWORD(vel_unsigned));
+		param_goal_velocity[2] = DXL_LOBYTE(DXL_HIWORD(vel_unsigned));
+		param_goal_velocity[3] = DXL_HIBYTE(DXL_HIWORD(vel_unsigned));
+		
 		dxl_addparam_result = groupSyncWriteVelocity->addParam(ids[i], param_goal_velocity);
 		if (dxl_addparam_result != true)
 		{
