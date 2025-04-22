@@ -203,24 +203,24 @@ add_library(dynamixel_sdk STATIC
 ## The recommended prefix ensures that target names across packages don't collide
 
 # Add the executables
-add_executable(m4_base_test
-	unit-tests/m4_base_test.cpp
-)
-
-add_executable(m4_controller_node
-	nodes/m4_controller_node.cpp
-)
-
+# add_executable(m4_base_test
+# 	unit-tests/m4_base_test.cpp
+# )
+# 
+# add_executable(m4_controller_node
+# 	# nodes/m4_controller_node.cpp
+# )
+# 
 # Link common libraries
-target_link_libraries(m4_base_test 
-m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
-${catkin_LIBRARIES}
-)
-
-target_link_libraries(m4_controller_node 
-m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
-${catkin_LIBRARIES}
-)
+# target_link_libraries(m4_base_test 
+# m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+# ${catkin_LIBRARIES}
+# )
+# 
+# target_link_libraries(m4_controller_node 
+# m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+# ${catkin_LIBRARIES}
+# )
 
 set(UNIT_TEST_SCRIPTS
 	# Stored in unit-tests
