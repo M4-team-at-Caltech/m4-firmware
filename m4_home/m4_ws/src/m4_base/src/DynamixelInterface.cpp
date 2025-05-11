@@ -406,20 +406,20 @@ DynamixelStatus DynamixelInterface::read_status()
 		status.current[i] = MULT_CURRENT * short(twos_complement(groupSyncRead->getData(active_joint_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT), LEN_PRESENT_CURRENT));
 	}
 
-	for(int i = 0; i < active_wheel_ids.size(); i++)
-	{
-		 dxl_getdata_result = groupSyncRead->isAvailable(active_wheel_ids[i], read_start_address, read_data_length);
-		 if (dxl_getdata_result != true)
-		 {
-			fprintf(stderr, "[ID:%03d] groupSyncRead getdata failed\n", active_wheel_ids[i]);
-		 }
+	// for(int i = 0; i < active_wheel_ids.size(); i++)
+	// {
+	// 	 dxl_getdata_result = groupSyncRead->isAvailable(active_wheel_ids[i], read_start_address, read_data_length);
+	// 	 if (dxl_getdata_result != true)
+	// 	 {
+	// 		fprintf(stderr, "[ID:%03d] groupSyncRead getdata failed\n", active_wheel_ids[i]);
+	// 	 }
 
-		WheelConfig wheel_configs = get_wheel_config(active_wheel_ids[i]);
+	// 	WheelConfig wheel_configs = get_wheel_config(active_wheel_ids[i]);
 
-		status.position[active_joint_ids.size() + i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION), LEN_PRESENT_POSITION));
-		status.velocity[active_joint_ids.size() + i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY), LEN_PRESENT_VELOCITY);
-		status.current[active_joint_ids.size() + i] = MULT_CURRENT * short(twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT), LEN_PRESENT_CURRENT));
-	}
+	// 	status.position[active_joint_ids.size() + i] = MULT_POSITION * (twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_POSITION, LEN_PRESENT_POSITION), LEN_PRESENT_POSITION));
+	// 	status.velocity[active_joint_ids.size() + i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY), LEN_PRESENT_VELOCITY);
+	// 	status.current[active_joint_ids.size() + i] = MULT_CURRENT * short(twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT), LEN_PRESENT_CURRENT));
+	// }
 	
 	status.names = servo_names;
 
@@ -563,7 +563,6 @@ int DynamixelInterface::write_movement_speed(int id, float movement_speed)
 
 int DynamixelInterface::write_velocity(std::vector<int> ids, std::vector<float> velocities)
 {
-	for(int i=0;i<velocities.size();i++) printf("dps: %f ", velocities[i]);
 	if(ids.size() != velocities.size())
 	{
 		fprintf(stderr, "[set_goal_velocity] Size mismatch between list of IDs and Velocities.\n");
@@ -601,8 +600,6 @@ int DynamixelInterface::write_velocity(std::vector<int> ids, std::vector<float> 
     int dxl_comm_result = COMM_TX_FAIL;
 	bool dxl_addparam_result = false;
 	uint8_t param_goal_velocity[4];
-
-	for(int i=0;i<velocities.size();i++) printf("raw: %f ", velocities[i]);
 
 	// Load goal positions to buffer
     for(int i = 0; i < ids.size(); i++)

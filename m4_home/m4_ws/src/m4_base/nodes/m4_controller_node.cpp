@@ -216,7 +216,7 @@ int main(int argc, char **argv)
 	std::vector<int> active_joint_ids = {1,2,3,4,5,6,7,8};
 	std::vector<int> active_wheel_ids = {9,10};
 	#ifndef DRY_RUN
-		M4Base m4(active_joint_ids, active_wheel_ids, true);
+		M4Base m4(active_joint_ids, active_wheel_ids, false);
 	#endif
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -262,6 +262,7 @@ int main(int argc, char **argv)
 			{
 				// If disarmed do nothing
 				case ArmMode::MODE_DISARM:
+					m4.drive(0,0);
 					break;
 
 				// If armed for ground mode
@@ -348,7 +349,8 @@ int main(int argc, char **argv)
 
 						if(drive_mode)
 						{
-							//TODO: Add drive function call
+							std::cout << "Sending vel: " << xvel_state << ", " << yvel_state << std::endl;
+							m4.drive(xvel_state,yvel_state);
 						}
 					}
 
