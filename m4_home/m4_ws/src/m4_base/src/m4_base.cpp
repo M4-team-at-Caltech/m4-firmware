@@ -168,7 +168,7 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			}
 
 			// Step 2: Move to UAV step1 position
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 			{
 				command_step = 2;
 				dxl.write_position(active_joint_ids, uav_step1_configuration);
@@ -248,7 +248,7 @@ void M4Base::execute_crouch1(int& command_step, bool& command_active, std::chron
 			}
 
 			// Step 2: Move to UAV step1 position
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 			{
 				command_step = 2;
 				dxl.write_position(active_joint_ids, uav_step1_configuration);
