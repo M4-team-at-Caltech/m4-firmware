@@ -14,7 +14,6 @@ uav_mode:
     channel_id: 10
     drive: 1004
     uav_transform: 2004
-    uav_ready: 2004
     
 x_velocity:
     channel_id: 2

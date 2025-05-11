@@ -352,6 +352,10 @@ int main(int argc, char **argv)
 							std::cout << "Sending vel: " << xvel_state << ", " << yvel_state << std::endl;
 							m4.drive(xvel_state,yvel_state);
 						}
+						else
+						{
+							m4.drive(0,0);
+						}
 					}
 
 					// MIP MODE NOT IMPLEMENTED! 
@@ -454,21 +458,6 @@ int main(int argc, char **argv)
 								}
 
 								break;
-
-							case UAVMode::MODE_UAV_READY:
-								// Move to UAV configuration if not already in it
-								if(current_configuration != M4Configurations::UAV)
-								{
-									ROS_WARN("Move to uav\n");
-
-									#ifndef DRY_RUN
-										m4.uav();
-									#else
-										current_configuration = M4Configurations::UAV;
-									#endif
-								}
-								
-								break;		
 						}
 					}
 			
@@ -488,9 +477,9 @@ int main(int argc, char **argv)
 					}
 
 					// Override arm command if not in UAV mode and ready (teensy handed control back to pixhawk)
-					if((current_configuration != M4Configurations::UAV) || (uav_channel_state != UAVMode::MODE_UAV_READY))
+					if((current_configuration != M4Configurations::UAV))
 					{
-						ROS_ERROR("Not in UAV READY MODE. Disarming!");
+						ROS_ERROR("Not in UAV CONFIGURATION. Disarming!");
 						mavros_msgs::CommandBool arm_cmd;
 						arm_cmd.request.value = false;
 						if(arming_client.call(arm_cmd) && arm_cmd.response.success)
@@ -500,7 +489,6 @@ int main(int argc, char **argv)
 					}
 
 					break;
-
 			}
 			
 		}	
@@ -511,15 +499,9 @@ int main(int argc, char **argv)
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-	
-	// teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
-	// teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-	// teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
 	#ifndef DRY_RUN
 		m4.sit();
 		while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	#endif
-	// teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-
 }
 
