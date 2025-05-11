@@ -207,9 +207,9 @@ add_library(dynamixel_sdk STATIC
  	unit-tests/m4_base_test.cpp
  )
  
-# add_executable(m4_controller_node
-# 	# nodes/m4_controller_node.cpp
-# )
+add_executable(m4_controller_node
+ 	 nodes/m4_controller_node.cpp
+ )
 # 
 # Link common libraries
  target_link_libraries(m4_base_test 
@@ -217,10 +217,10 @@ add_library(dynamixel_sdk STATIC
  ${catkin_LIBRARIES}
  )
 
-# target_link_libraries(m4_controller_node 
-# m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
-# ${catkin_LIBRARIES}
-# )
+target_link_libraries(m4_controller_node 
+m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+${catkin_LIBRARIES}
+)
 
 set(UNIT_TEST_SCRIPTS
 	# Stored in unit-tests

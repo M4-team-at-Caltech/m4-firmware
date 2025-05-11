@@ -1,5 +1,5 @@
 drive_mode:
-    channel_id: 11
+    channel_id: 8
     stand: 1000
     crouch1: 1500
     crouch2: 2000
@@ -11,7 +11,7 @@ drive_mode:
 #     mip_ready: 1934 
   
 uav_mode:
-    channel_id: 10
+    channel_id: 6
     drive: 1000
     uav_transform: 1500
     uav_ready: 2000
