@@ -357,6 +357,47 @@ int DynamixelInterface::disconnect()
 	return 1;
 }
 
+int DynamixelInterface::toggle_torque(std::vector<int> ids, bool state)
+{
+	uint8_t dxl_error = 0;  
+    int dxl_comm_result = COMM_TX_FAIL;
+
+	int torque_state;
+	if(state)
+		torque_state = TORQUE_ENABLE;
+	else
+		torque_state = TORQUE_DISABLE;
+
+	if(!IsSubset(active_joint_ids, ids) && !IsSubset(active_wheel_ids, ids))
+	{
+		printf("\nSome IDs were not in active IDs! Ignoring command.\n");
+		return 0;
+	}
+
+	for(int i = 0; i < ids.size(); i++)
+	{
+		dxl_comm_result = packetHandler->write1ByteTxRx(portHandler, ids[i], ADDR_TORQUE_ENABLE, torque_state, &dxl_error);
+        if (dxl_comm_result!= COMM_SUCCESS)
+        {
+            printf("\nUnable to change torque for Dynamixel %d\n\n", ids[i]);
+            printf("%s\n", packetHandler->getTxRxResult(dxl_comm_result));
+            return 0;
+        }
+        else if (dxl_error!= 0)
+        {
+            printf("\nUnable to change torque for Dynamixel %d\n\n", ids[i]);
+            printf("%s\n", packetHandler->getRxPacketError(dxl_error));
+            return 0;
+        }
+        else
+		{
+            printf("Dynamixel#%d torque has been successfully toggled. \n", ids[i]);
+        }	
+	}
+
+	return 1;
+}
+
 DynamixelStatus DynamixelInterface::read_status()
 {
 	int dxl_comm_result = COMM_TX_FAIL;

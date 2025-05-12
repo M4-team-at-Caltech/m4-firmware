@@ -66,6 +66,7 @@ class DynamixelInterface
 		void init(const char* port, const int &baudrate, const std::vector<int> &joint_ids, const std::vector<int> &wheel_ids);
 
 		// Command functions
+		int toggle_torque(std::vector<int> ids, bool state);
 		int write_position(std::vector<int> ids, std::vector<float> positions);
 		int write_movement_speed(int id, float movement_speed);
 		int write_velocity(std::vector<int> ids, std::vector<float> velocities);
