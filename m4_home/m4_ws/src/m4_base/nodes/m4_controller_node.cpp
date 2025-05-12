@@ -79,8 +79,7 @@ enum MIPMode
 enum UAVMode
 {
 	MODE_UAV_DISABLE,
-	MODE_UAV_TRANSFORM,
-	MODE_UAV_READY
+	MODE_UAV_TRANSFORM
 }uav_channel_state;
 
 enum ArmMode
@@ -134,8 +133,6 @@ void rc_subscriber_callback(const mavros_msgs::RCIn &rc_msg)
 		uav_channel_state = UAVMode::MODE_UAV_DISABLE;
 	} else if (rc_msg.channels[uav_config.channel_id-1] == uav_config.uav_transform) {
 		uav_channel_state = UAVMode::MODE_UAV_TRANSFORM;
-	} else if (rc_msg.channels[uav_config.channel_id-1] == uav_config.uav_ready) {
-		uav_channel_state = UAVMode::MODE_UAV_READY;
 	}
 
 	// ARM Channel
@@ -178,7 +175,6 @@ void init_configs(std::string config_path)
 	uav_config.channel_id = config["uav_mode"]["channel_id"].as<int>();
 	uav_config.drive = config["uav_mode"]["drive"].as<int>();
 	uav_config.uav_transform = config["uav_mode"]["uav_transform"].as<int>();
-	uav_config.uav_ready = config["uav_mode"]["uav_ready"].as<int>();
 
 	xvel_config.channel_id = config["x_velocity"]["channel_id"].as<int>();
 	xvel_config.min = config["x_velocity"]["min"].as<int>();
@@ -263,6 +259,7 @@ int main(int argc, char **argv)
 				// If disarmed do nothing
 				case ArmMode::MODE_DISARM:
 					m4.drive(0,0);
+					drive_mode = false;
 					break;
 
 				// If armed for ground mode
@@ -283,6 +280,7 @@ int main(int argc, char **argv)
 								// Do nothing if already in stand configuration
 								if(current_configuration == M4Configurations::STAND)
 								{
+									drive_mode = true;
 									break;
 								}
 
@@ -349,7 +347,6 @@ int main(int argc, char **argv)
 
 						if(drive_mode)
 						{
-							std::cout << "Sending vel: " << xvel_state << ", " << yvel_state << std::endl;
 							m4.drive(xvel_state,yvel_state);
 						}
 						else
@@ -446,6 +443,7 @@ int main(int argc, char **argv)
 
 								else // Move to uav configuration
 								{
+									m4.drive(0.0,0.0);
 									drive_mode = false;
 									
 									ROS_WARN("Move to uav\n");
