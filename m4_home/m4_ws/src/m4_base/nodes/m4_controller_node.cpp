@@ -145,12 +145,12 @@ void rc_subscriber_callback(const mavros_msgs::RCIn &rc_msg)
 		arm_channel_state = ArmMode::MODE_AERIAL_ARM;
 	}
 
-	xvel_state = float((xvel_config.zero - rc_msg.channels[xvel_config.channel_id-1])) / (xvel_config.max - xvel_config.zero);
+	xvel_state = float((-xvel_config.zero + rc_msg.channels[xvel_config.channel_id-1])) / (xvel_config.max - xvel_config.zero);
 	yvel_state = float(rc_msg.channels[yvel_config.channel_id-1] - yvel_config.zero) / (yvel_config.max - yvel_config.zero);
 
-	if abs(xvel_state) <= velocity_deadzone
+	if (abs(xvel_state) <= velocity_deadzone)
 		xvel_state = 0;
-	if abs(yvel_state) <= velocity_deadzone
+	if (abs(yvel_state) <= velocity_deadzone)
 		yvel_state = 0;
 
 	rc_state_available = true;

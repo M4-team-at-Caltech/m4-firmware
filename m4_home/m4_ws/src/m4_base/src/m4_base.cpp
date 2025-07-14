@@ -79,7 +79,6 @@ void M4Base::control_loop()
 		}
 
 		update_state();
-		execute_drive();
 
 		// Execute commands
 		if(!command_queue.empty() || command_active)
@@ -94,7 +93,7 @@ void M4Base::control_loop()
 			{
 				case M4Commands::CMD_STAND:
 					execute_stand(command_step, command_active, gait_start);
-                    break;
+		                        break;
 				case M4Commands::CMD_CROUCH1:
 					execute_crouch1(command_step, command_active, gait_start);
 					break;
@@ -111,6 +110,11 @@ void M4Base::control_loop()
 					execute_mip(command_step, command_active, gait_start);
 					break;
 			}
+		}
+
+		else
+		{
+		    execute_drive();
 		}
 
 		// Sleep until next loop time
@@ -138,10 +142,20 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			// Step 1: Move to Standing
 			if(command_step == 0)
 			{
+				wheel_velocity_cmd = get_active_wheel_velocities(transition_wheel_vel_in);
+			        wheel_velocity_cmd_ids = active_wheel_ids;
+			        dxl.write_velocity(wheel_velocity_cmd_ids, wheel_velocity_cmd);
 				dxl.write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
+			}
+
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) < 2 && command_step == 1)
+			{
+				wheel_velocity_cmd = get_active_wheel_velocities(transition_wheel_vel_in);
+                                wheel_velocity_cmd_ids = active_wheel_ids;
+                                dxl.write_velocity(wheel_velocity_cmd_ids, wheel_velocity_cmd);
 			}
 
 			// Complete
@@ -159,6 +173,7 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			if(command_step == 0)
 			{
 				dxl.write_velocity(active_wheel_ids, transition_wheel_vel_in);
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				dxl.write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
@@ -735,8 +750,8 @@ void M4Base::execute_drive()
 	float right_wheel_velocity, left_wheel_velocity = 0;
 	{// MUTEX LOCK
 		std::lock_guard<std::mutex> lock(drive_cmd);
-		right_wheel_velocity = ((linear_velocity_cmd + 4 * angular_velocity_cmd * wheel_base / 2.0) / wheel_radius)*360/(2*M_PI);
-		left_wheel_velocity = ((linear_velocity_cmd - 4 * angular_velocity_cmd * wheel_base / 2.0) / wheel_radius)*360/(2*M_PI);
+		right_wheel_velocity = ((linear_velocity_cmd - 4 * angular_velocity_cmd * wheel_base / 2.0) / wheel_radius)*360/(2*M_PI);
+		left_wheel_velocity = ((linear_velocity_cmd + 4 * angular_velocity_cmd * wheel_base / 2.0) / wheel_radius)*360/(2*M_PI);
 	}// MUTEX UNLOCK
 
 	std::vector<float> wheel_velocity_list = {left_wheel_velocity, right_wheel_velocity, left_wheel_velocity, right_wheel_velocity};

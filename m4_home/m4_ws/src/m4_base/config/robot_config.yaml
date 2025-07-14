@@ -1,5 +1,5 @@
 interface_port: "/dev/U2D2"
-baudrate: 4500000
+baudrate: 2000000
 
 log_path: "/home/m4/data"
 log_buffer_size: 4000
@@ -120,4 +120,4 @@ config_uav_step1: [40, 90, 40, 90, 40, 90, 40, 90]
 config_uav_step2: [90, 0, 90, 0, 90, 0, 90, 0]
 config_uav: [90, 0, 90, 0, 90, 0, 90, 0]
 config_mip: [90, 45, 90, 45, 0, 90, 0, 90]
-config_transition_wheel_vel: 0.09 # m/s
+config_transition_wheel_vel: 100
