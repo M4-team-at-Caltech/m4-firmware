@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 
 	// std::vector<int> active_joint_ids = {1, 2, 3, 4, 5, 6, 7, 8};
 	std::vector<int> active_joint_ids = {1,2,3,4,5,6,7,8};
-	std::vector<int> active_wheel_ids = {9,10};
+	std::vector<int> active_wheel_ids = {9,10,11,12};
 	#ifndef DRY_RUN
 		M4Base m4(active_joint_ids, active_wheel_ids, false);
 	#endif
