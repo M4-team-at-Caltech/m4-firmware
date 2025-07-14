@@ -120,3 +120,4 @@ config_uav_step2: [40, 90, 40, 90, 40, 90, 40, 90]
 config_uav_step1: [90, 0, 90, 0, 90, 0, 90, 0]
 config_uav: [90, 0, 90, 0, 90, 0, 90, 0]
 config_mip: [90, 45, 90, 45, 0, 90, 0, 90]
+config_transition_wheel_vel: 0.09 # m/s

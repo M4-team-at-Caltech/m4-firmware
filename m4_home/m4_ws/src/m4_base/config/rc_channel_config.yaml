@@ -27,6 +27,8 @@ y_velocity:
     zero: 1505
     max: 1999
 
+velocity_deadzone: 0.05 # 0-1: percentage of velocity range to assign as deadzone.
+
 arming:
     channel_id: 8
     disarm: 999

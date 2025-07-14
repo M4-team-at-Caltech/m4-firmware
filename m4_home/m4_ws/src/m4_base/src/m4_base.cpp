@@ -37,6 +37,9 @@ M4Base::M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_
 	uav_step1_configuration = get_active_joint_positions(config["config_uav_step1"].as<std::vector<float>>());
 	uav_step2_configuration = get_active_joint_positions(config["config_uav_step2"].as<std::vector<float>>());
 	mip_configuration = get_active_joint_positions(config["config_mip"].as<std::vector<float>>());
+	float transition_vel = config["config_transition_wheel_vel"].as<float>();
+	transition_wheel_vel_in = get_active_wheel_velocities({-transition_vel, -transition_vel, transition_vel, transition_vel});
+	transition_wheel_vel_out = get_active_wheel_velocities({transition_vel, transition_vel, -transition_vel, -transition_vel});
 
 	dxl.init(interface_port.c_str(), baudrate, active_joint_ids, active_wheel_ids);
 
@@ -155,7 +158,7 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			// Step 1: Move to Standing
 			if(command_step == 0)
 			{
-				dxl.toggle_torque(active_wheel_ids, false);
+				dxl.write_velocity(active_wheel_ids, transition_wheel_vel_in);
 				dxl.write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
@@ -163,9 +166,9 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			}
 
 			// Complete
-			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
+			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 1.5 && command_step == 1)
 			{
-				dxl.toggle_torque(active_wheel_ids, true);
+				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Stand Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -207,7 +210,7 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 3)
 			{
 				command_step = 4;
-				dxl.toggle_torque(active_wheel_ids, false);
+				dxl.write_velocity(active_wheel_ids, transition_wheel_vel_in);
 				dxl.write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
@@ -215,7 +218,7 @@ void M4Base::execute_stand(int& command_step, bool& command_active, std::chrono:
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 4)
 			{
-				dxl.toggle_torque(active_wheel_ids, true);
+				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Stand Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -241,6 +244,7 @@ void M4Base::execute_crouch1(int& command_step, bool& command_active, std::chron
 			// Step 1: Move to crouch1 position
 			if(command_step == 0)
 			{
+				dxl.write_velocity(active_wheel_ids, transition_wheel_vel_out);
 				dxl.write_position(active_joint_ids, crouch1_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
@@ -250,6 +254,7 @@ void M4Base::execute_crouch1(int& command_step, bool& command_active, std::chron
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
 			{
+				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -289,7 +294,7 @@ void M4Base::execute_crouch1(int& command_step, bool& command_active, std::chron
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 3)
 			{
 				dxl.write_position(active_joint_ids, crouch1_configuration);
-				dxl.toggle_torque(active_wheel_ids, false);
+				dxl.write_velocity(active_wheel_ids, transition_wheel_vel_out);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 4;
 				command_active = true;
@@ -298,7 +303,7 @@ void M4Base::execute_crouch1(int& command_step, bool& command_active, std::chron
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 4)
 			{
-				dxl.toggle_torque(active_wheel_ids, true);
+				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -381,7 +386,7 @@ void M4Base::execute_crouch2(int& command_step, bool& command_active, std::chron
 			// Step 5: Move to crouch2 position
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 4)
 			{
-				dxl.toggle_torque(active_wheel_ids, false);
+				dxl.write_velocity(active_wheel_ids, transition_wheel_vel_in);
 				dxl.write_position(active_joint_ids, crouch2_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 5;
@@ -391,7 +396,7 @@ void M4Base::execute_crouch2(int& command_step, bool& command_active, std::chron
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 5)
 			{
-				dxl.toggle_torque(active_wheel_ids, true);
+				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -418,7 +423,7 @@ void M4Base::execute_sit(int& command_step, bool& command_active, std::chrono::_
 			// Step 1: Move to sit position
 			if(command_step == 0)
 			{
-				dxl.toggle_torque(active_wheel_ids, false);
+				dxl.write_velocity(active_wheel_ids, transition_wheel_vel_out);
 				dxl.write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
@@ -428,7 +433,7 @@ void M4Base::execute_sit(int& command_step, bool& command_active, std::chrono::_
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
 			{
-				dxl.toggle_torque(active_wheel_ids, true);
+				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Sit Transformation complete!\n");
 				command_step = 0;
 				command_active = false;

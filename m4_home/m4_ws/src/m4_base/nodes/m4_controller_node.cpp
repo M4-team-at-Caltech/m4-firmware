@@ -98,6 +98,7 @@ enum M4Mode
 
 float xvel_state;
 float yvel_state;
+float velocity_deadzone;
 
 mavros_msgs::State pixhawk_state;
 
@@ -147,6 +148,11 @@ void rc_subscriber_callback(const mavros_msgs::RCIn &rc_msg)
 	xvel_state = float((xvel_config.zero - rc_msg.channels[xvel_config.channel_id-1])) / (xvel_config.max - xvel_config.zero);
 	yvel_state = float(rc_msg.channels[yvel_config.channel_id-1] - yvel_config.zero) / (yvel_config.max - yvel_config.zero);
 
+	if abs(xvel_state) <= velocity_deadzone
+		xvel_state = 0;
+	if abs(yvel_state) <= velocity_deadzone
+		yvel_state = 0;
+
 	rc_state_available = true;
 }
 
@@ -185,6 +191,8 @@ void init_configs(std::string config_path)
 	yvel_config.min = config["y_velocity"]["min"].as<int>();
 	yvel_config.max = config["y_velocity"]["max"].as<int>();
 	yvel_config.zero = config["y_velocity"]["zero"].as<int>();
+
+	velocity_deadzone = config["velocity_deadzone"].as<float>();
 
 	arm_config.channel_id = config["arming"]["channel_id"].as<int>();
 	arm_config.disarm = config["arming"]["disarm"].as<int>();
