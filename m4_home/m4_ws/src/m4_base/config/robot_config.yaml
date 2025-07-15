@@ -6,6 +6,10 @@ log_buffer_size: 4000
 
 control_loop_rate: 200
 
+# Robot dimensions (for differential drive kinematics)
+wheel_radius: 0.1 # Radius of the wheel in meters
+wheel_base: 0.285 # Distance between left and right wheels in meters
+
 # List of All joint ids defined below. Acive joint ids defined in executables
 all_joint_ids: [1, 2, 3, 4, 5, 6, 7, 8]
 
@@ -95,21 +99,20 @@ wheel_names:
 wheels:
     FL_Wheel:           
         id: 9             # Dynamixel motor ID
-        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374
-        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374
+        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374 (rev/min)
+        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374 (rev/min)
     FR_Wheel:
         id: 10            # Dynamixel motor ID
-        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374
-        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374
-    BL_Wheel:           
+        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374 (rev/min)
+        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374 (rev/min)
+    BL_Wheel:
         id: 11             # Dynamixel motor ID
-        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374
-        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374
+        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374 (rev/min)
+        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374 (rev/min)
     BR_Wheel:
         id: 12            # Dynamixel motor ID
-        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374
-        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374
-
+        min_speed: -330   # min_speed = min_speed_degrees_per_second / 1.374 (rev/min)
+        max_speed: 330    # max_speed = max_speed_degrees_per_second / 1.374 (rev/min)
 
 # Standard Configurations    
 config_stand: [0, 0, 0, 0, 0, 0, 0, 0]
@@ -120,4 +123,4 @@ config_uav_step1: [40, 90, 40, 90, 40, 90, 40, 90]
 config_uav_step2: [90, 0, 90, 0, 90, 0, 90, 0]
 config_uav: [90, 0, 90, 0, 90, 0, 90, 0]
 config_mip: [90, 45, 90, 45, 0, 90, 0, 90]
-config_transition_wheel_vel: 100
+config_transition_wheel_vel: 100  # In rev/min

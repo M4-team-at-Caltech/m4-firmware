@@ -77,6 +77,8 @@ class M4Base
 		std::vector<float> uav_step3_configuration;
 		std::vector<float> uav_step4_configuration;
 		std::vector<float> mip_configuration;
+		float wheel_radius;
+		float wheel_base;
 		std::vector<float> transition_wheel_vel_in;
 		std::vector<float> transition_wheel_vel_out;
 		std::vector<std::vector<float>> transform_stand_to_crouch;
