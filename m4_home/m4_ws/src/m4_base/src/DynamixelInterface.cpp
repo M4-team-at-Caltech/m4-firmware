@@ -636,7 +636,6 @@ int DynamixelInterface::write_velocity(std::vector<int> ids, std::vector<float> 
 		
 		// printf("[INFO]: Writing position %d=%f deg to joint %s\n", int(positions[i]), (positions[i] - jconfig.zero_tick)*MULT_POSITION, jconfig.name.c_str());
 	}
-	std::cout << std::endl;
 
 	int dxl_error = 0;
     int dxl_comm_result = COMM_TX_FAIL;
