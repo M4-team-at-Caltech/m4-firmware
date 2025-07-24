@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 		current_configuration = m4.get_current_configuration();
 
 		// Menu
-        std::cout << "Keypress guide: " << std::endl;
+        std::cout << "\n\nKeypress guide: " << std::endl;
 		std::cout << "w : [DRIVE] Add lin vel" << std::endl;
         std::cout << "s : [DRIVE] Sub lin vel" << std::endl;
         std::cout << "d : [DRIVE] Add ang vel" << std::endl;
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 					char confirm;
 					std::cout << "Switching out of UAV mode. Check that drone is not ARMED! \n\n Are you sure? (y/n): ";
 					std::cin >> confirm;
-					if(confirm != 'y' || confirm != 'Y')
+					if(confirm != 'y' && confirm != 'Y')
 					{
 						std::cout << "Cancelling mode switching!" << std::endl;
 						break;
@@ -205,7 +205,7 @@ int main(int argc, char **argv)
 					char confirm;
 					std::cout << "Switching out of UAV mode. Check that drone is not ARMED! \n\n Are you sure? (y/n): ";
 					std::cin >> confirm;
-					if(confirm != 'y' || confirm != 'Y')
+					if(confirm != 'y' && confirm != 'Y')
 					{
 						std::cout << "Cancelling mode switching!" << std::endl;
 						break;
@@ -223,7 +223,7 @@ int main(int argc, char **argv)
 					char confirm;
 					std::cout << "Switching out of UAV mode. Check that drone is not ARMED! \n\n Are you sure? (y/n): ";
 					std::cin >> confirm;
-					if(confirm != 'y' || confirm != 'Y')
+					if(confirm != 'y' && confirm != 'Y')
 					{
 						std::cout << "Cancelling mode switching!" << std::endl;
 						break;
