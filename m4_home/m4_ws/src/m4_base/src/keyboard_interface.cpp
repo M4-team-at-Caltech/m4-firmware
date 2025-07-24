@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 #include <atomic>
+#include <csignal>
 #include <yaml-cpp/yaml.h>
 #include <std_msgs/UInt8.h>
 #include "m4_base.h"
@@ -186,7 +187,7 @@ int main(int argc, char **argv)
 					char confirm;
 					std::cout << "Switching out of UAV mode. Check that drone is not ARMED! \n\n Are you sure? (y/n): ";
 					std::cin >> confirm;
-					if(confirm != 'y' || confirm != 'Y' || confirm != 'yes')
+					if(confirm != 'y' || confirm != 'Y')
 					{
 						std::cout << "Cancelling mode switching!" << std::endl;
 						break;
@@ -204,7 +205,7 @@ int main(int argc, char **argv)
 					char confirm;
 					std::cout << "Switching out of UAV mode. Check that drone is not ARMED! \n\n Are you sure? (y/n): ";
 					std::cin >> confirm;
-					if(confirm != 'y' || confirm != 'Y' || confirm != 'yes')
+					if(confirm != 'y' || confirm != 'Y')
 					{
 						std::cout << "Cancelling mode switching!" << std::endl;
 						break;
@@ -222,7 +223,7 @@ int main(int argc, char **argv)
 					char confirm;
 					std::cout << "Switching out of UAV mode. Check that drone is not ARMED! \n\n Are you sure? (y/n): ";
 					std::cin >> confirm;
-					if(confirm != 'y' || confirm != 'Y' || confirm != 'yes')
+					if(confirm != 'y' || confirm != 'Y')
 					{
 						std::cout << "Cancelling mode switching!" << std::endl;
 						break;
@@ -249,13 +250,13 @@ int main(int argc, char **argv)
 
             default:
             {
-                cout << "Invalid key" << endl;
+                std::cout << "Invalid key" << std::endl;
             }
         }
 
 
 		// Do every loop
-			if(current_configuration == M4Configurations::STAND) || (current_configuration == M4Configurations::CROUCH1) || (current_configuration == M4Configurations::CROUCH2)
+			if((current_configuration == M4Configurations::STAND) || (current_configuration == M4Configurations::CROUCH1) || (current_configuration == M4Configurations::CROUCH2))
 			{
 				drive_mode = true;
 			}
@@ -269,8 +270,6 @@ int main(int argc, char **argv)
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-	#ifndef DRY_RUN
-		m4.sit();
-		while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	#endif
+	m4.sit();
+	while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }

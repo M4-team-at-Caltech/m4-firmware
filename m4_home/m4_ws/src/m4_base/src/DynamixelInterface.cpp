@@ -634,7 +634,6 @@ int DynamixelInterface::write_velocity(std::vector<int> ids, std::vector<float> 
 			velocities[i] = wconfig.max_speed;
 		}
 		
-		std::cout << velocities[i] << " ";
 		// printf("[INFO]: Writing position %d=%f deg to joint %s\n", int(positions[i]), (positions[i] - jconfig.zero_tick)*MULT_POSITION, jconfig.name.c_str());
 	}
 	std::cout << std::endl;

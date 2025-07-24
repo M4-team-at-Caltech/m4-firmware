@@ -206,6 +206,10 @@ add_library(dynamixel_sdk STATIC
  add_executable(m4_base_test
  	unit-tests/m4_base_test.cpp
  )
+
+add_executable(keyboard_interface
+	src/keyboard_interface.cpp
+)
  
 add_executable(m4_controller_node
  	 nodes/m4_controller_node.cpp
@@ -218,6 +222,11 @@ add_executable(m4_controller_node
  )
 
 target_link_libraries(m4_controller_node 
+m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
+${catkin_LIBRARIES}
+)
+
+target_link_libraries(keyboard_interface
 m4_base DynamixelInterface dynamixel_sdk yaml-cpp utils Logger
 ${catkin_LIBRARIES}
 )
