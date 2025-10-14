@@ -1,0 +1,36 @@
+drive_mode:
+    channel_id: 11
+    stand: 993
+    crouch1: 1497
+    crouch2: 1994
+
+# mip_mode:
+#     channel_id: 8
+#     drive: 1094
+#     mip_transform: 1514
+#     mip_ready: 1934 
+  
+uav_mode:
+    channel_id: 7
+    drive: 993
+    uav_transform: 1994
+    
+x_velocity:
+    channel_id: 2
+    min: 983
+    zero: 1494
+    max: 2006
+
+y_velocity:
+    channel_id: 1
+    min: 983
+    zero: 1494
+    max: 2006
+
+velocity_deadzone: 0.05 # 0-1: percentage of velocity range to assign as deadzone.
+
+arming:
+    channel_id: 12
+    disarm: 993
+    ground_mode_arm: 1497
+    aerial_mode_arm: 1994
