@@ -79,8 +79,7 @@ enum MIPMode
 enum UAVMode
 {
 	MODE_UAV_DISABLE,
-	MODE_UAV_TRANSFORM,
-	MODE_UAV_READY
+	MODE_UAV_TRANSFORM
 }uav_channel_state;
 
 enum ArmMode
@@ -97,26 +96,9 @@ enum M4Mode
 	MODE_UAV
 }current_mode;
 
-enum TeensyCmd
-{
-	TEENSY_INIT,
-	POSE_RECEIVED,
-    TWIST_ACK,
-
-	TRANSFORM_ROVER=2,
-	TRANSFORM_UAV=3,
-	TRANSFORM_MIP=4,
-
-	WHEEL_IN=100,
-    WHEEL_OUT=101,
-	DRIVE=102,
-	UAV_ENABLE=103,
-	MIP_BALANCE=104,
-	STOP=105,
-}teensy_cmd_flag;
-
 float xvel_state;
 float yvel_state;
+float velocity_deadzone;
 
 mavros_msgs::State pixhawk_state;
 
@@ -152,8 +134,6 @@ void rc_subscriber_callback(const mavros_msgs::RCIn &rc_msg)
 		uav_channel_state = UAVMode::MODE_UAV_DISABLE;
 	} else if (rc_msg.channels[uav_config.channel_id-1] == uav_config.uav_transform) {
 		uav_channel_state = UAVMode::MODE_UAV_TRANSFORM;
-	} else if (rc_msg.channels[uav_config.channel_id-1] == uav_config.uav_ready) {
-		uav_channel_state = UAVMode::MODE_UAV_READY;
 	}
 
 	// ARM Channel
@@ -165,8 +145,13 @@ void rc_subscriber_callback(const mavros_msgs::RCIn &rc_msg)
 		arm_channel_state = ArmMode::MODE_AERIAL_ARM;
 	}
 
-	xvel_state = float((xvel_config.zero - rc_msg.channels[xvel_config.channel_id-1])) / (xvel_config.max - xvel_config.zero);
+	xvel_state = float((-xvel_config.zero + rc_msg.channels[xvel_config.channel_id-1])) / (xvel_config.max - xvel_config.zero);
 	yvel_state = float(rc_msg.channels[yvel_config.channel_id-1] - yvel_config.zero) / (yvel_config.max - yvel_config.zero);
+
+	if (abs(xvel_state) <= velocity_deadzone)
+		xvel_state = 0;
+	if (abs(yvel_state) <= velocity_deadzone)
+		yvel_state = 0;
 
 	rc_state_available = true;
 }
@@ -196,7 +181,6 @@ void init_configs(std::string config_path)
 	uav_config.channel_id = config["uav_mode"]["channel_id"].as<int>();
 	uav_config.drive = config["uav_mode"]["drive"].as<int>();
 	uav_config.uav_transform = config["uav_mode"]["uav_transform"].as<int>();
-	uav_config.uav_ready = config["uav_mode"]["uav_ready"].as<int>();
 
 	xvel_config.channel_id = config["x_velocity"]["channel_id"].as<int>();
 	xvel_config.min = config["x_velocity"]["min"].as<int>();
@@ -208,58 +192,16 @@ void init_configs(std::string config_path)
 	yvel_config.max = config["y_velocity"]["max"].as<int>();
 	yvel_config.zero = config["y_velocity"]["zero"].as<int>();
 
+	velocity_deadzone = config["velocity_deadzone"].as<float>();
+
 	arm_config.channel_id = config["arming"]["channel_id"].as<int>();
 	arm_config.disarm = config["arming"]["disarm"].as<int>();
 	arm_config.ground_mode_arm = config["arming"]["ground_mode_arm"].as<int>();
 	arm_config.aerial_mode_arm = config["arming"]["aerial_mode_arm"].as<int>();
 
 	drive_mode = false;
-	teensy_ack = false;
 	rc_state_available = false;
 	pixhawk_state_available = false;
-	teensy_cmd_flag = TeensyCmd::TEENSY_INIT;
-}
-
-// Teensy command interface
-void teensy_cmd(ros::Publisher &teensy_cmd_pub, TeensyCmd cmd)
-{
-	std_msgs::UInt8 cmd_msg;
-	cmd_msg.data = cmd;
-	teensy_cmd_pub.publish(cmd_msg);
-
-	while(!teensy_ack)
-	{
-		ros::spinOnce();
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	}
-
-	teensy_ack = false;
-	teensy_cmd_flag = cmd;
-}
-
-void teensy_ack_subscriber(const std_msgs::UInt8 &ack_msg)
-{
-	teensy_ack = true;
-}
-
-void teensy_vel_publisher(ros::Publisher &teensy_vel_pub)
-{
-	geometry_msgs::Twist twist_msg;
-	geometry_msgs::Vector3 linear;
-	geometry_msgs::Vector3 angular;
-
-	linear.x = xvel_state;
-	linear.y = 0;
-	linear.z = 0;
-	angular.z = yvel_state;
-	angular.y = 0;
-	angular.x = 0;
-
-	// ROS_INFO("Sending velocities: vx = %f, vy = %f",xvel_state,yvel_state);
-
-	twist_msg.linear = linear;
-	twist_msg.angular = angular;
-	teensy_vel_pub.publish(twist_msg);
 }
 
 int main(int argc, char **argv)
@@ -271,41 +213,29 @@ int main(int argc, char **argv)
 
 	ros::Subscriber rc_sub = nh.subscribe("/mavros/rc/in", 1, rc_subscriber_callback);
 	ros::Subscriber pixhawk_state_sub = nh.subscribe("/mavros/state", 1, pixhawk_state_subscriber_callback);
-	ros::Subscriber teensy_ack_sub = nh.subscribe("/teensy/ack_code", 1, teensy_ack_subscriber);
 	ros::ServiceClient arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
 	ros::Publisher rc_override_pub = nh.advertise<mavros_msgs::OverrideRCIn>("/mavros/rc/override", 1);
-	ros::Publisher teensy_vel_pub = nh.advertise<geometry_msgs::Twist>("/robot/twist_command", 10);
-	ros::Publisher teensy_cmd_pub = nh.advertise<std_msgs::UInt8>("/teensy/cmd_code", 10);
-
 
 	// std::vector<int> active_joint_ids = {1, 2, 3, 4, 5, 6, 7, 8};
-	std::vector<int> active_joint_ids = {5, 6};
+	std::vector<int> active_joint_ids = {1,2,3,4,5,6,7,8};
+	std::vector<int> active_wheel_ids = {9,10,11,12};
 	#ifndef DRY_RUN
-		M4Base m4(active_joint_ids, true);
+		M4Base m4(active_joint_ids, active_wheel_ids, false);
 	#endif
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 	#ifndef DRY_RUN
 		m4.sit();
 		std::cout<<"Sit complete!\n";
 		while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		std::cout<<"Sit wait complete!\n";
 	#endif
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);	
 	
 	#ifndef DRY_RUN
 		m4.stand();
 		while(m4.get_current_configuration() != M4Configurations::STAND) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	#endif
-
-	teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 
 	ros::Rate loop_rate(200);
 
@@ -336,11 +266,8 @@ int main(int argc, char **argv)
 			{
 				// If disarmed do nothing
 				case ArmMode::MODE_DISARM:
-					if(teensy_cmd_flag != TeensyCmd::STOP)
-					{
-						teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-						drive_mode = false;
-					}
+					m4.drive(0,0);
+					drive_mode = false;
 					break;
 
 				// If armed for ground mode
@@ -361,33 +288,19 @@ int main(int argc, char **argv)
 								// Do nothing if already in stand configuration
 								if(current_configuration == M4Configurations::STAND)
 								{
-									if(teensy_cmd_flag != TeensyCmd::DRIVE)
-									{
-										drive_mode = true;
-										teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
-									}
-
+									drive_mode = true;
 									break;
 								}
 
 								else // Move to stand configuration
 								{
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 									ROS_WARN("Move to stand");
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
 									
 									#ifndef DRY_RUN
 										m4.stand();
 									#else
 										current_configuration = M4Configurations::STAND;
 									#endif
-									
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_ROVER);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
 
 									drive_mode = true;
 								}
@@ -398,38 +311,19 @@ int main(int argc, char **argv)
 								// Do nothing if already in crouch1 configuration
 								if(current_configuration == M4Configurations::CROUCH1)
 								{
-									if(teensy_cmd_flag != TeensyCmd::DRIVE)
-									{
-										drive_mode = true;
-										teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
-									}
-
 									break;
 								}
 
 								else // Move to crouch1 configuration
 								{
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
 									std::this_thread::sleep_for(std::chrono::milliseconds(500));
 									ROS_WARN("Move to crouch1");
-									
-									if(current_configuration == M4Configurations::STAND)
-                                        teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
-                                    else
-										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
-									
+										
 									#ifndef DRY_RUN
 										m4.crouch1();
 									#else
 										current_configuration = M4Configurations::CROUCH1;
 									#endif
-
-
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_ROVER);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
 
 									drive_mode = true;
 								}				
@@ -440,38 +334,18 @@ int main(int argc, char **argv)
 								// Do nothing if already in crouch 2 configuration
 								if(current_configuration == M4Configurations::CROUCH2)
 								{
-									if(teensy_cmd_flag != TeensyCmd::DRIVE)
-									{
-										drive_mode = true;
-										teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
-									}
-
 									break;
 								}
 
 								else // Move to crouch2 configuration
 								{
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
 									ROS_WARN("Move to crouch2");
-
-									if(current_configuration == M4Configurations::STAND || current_configuration == M4Configurations::CROUCH1)
-                                        teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
-                                    else
-										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
 
 									#ifndef DRY_RUN
 										m4.crouch2();
 									#else
 										current_configuration = M4Configurations::CROUCH2;
 									#endif
-
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_ROVER);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
 
 									drive_mode = true;
 								}
@@ -481,7 +355,11 @@ int main(int argc, char **argv)
 
 						if(drive_mode)
 						{
-							teensy_vel_publisher(teensy_vel_pub);
+							m4.drive(xvel_state,yvel_state);
+						}
+						else
+						{
+							m4.drive(0,0);
 						}
 					}
 
@@ -568,23 +446,13 @@ int main(int argc, char **argv)
 								// Do nothing if already in uav configuration
 								if(current_configuration == M4Configurations::UAV)
 								{
-									if(!teensy_cmd_flag == TeensyCmd::STOP)
-                                    {
-                                        teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-										drive_mode = false;
-                                    }
-
 									break;
 								}
 
 								else // Move to uav configuration
 								{
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
+									m4.drive(0.0,0.0);
 									drive_mode = false;
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-									if(current_configuration == M4Configurations::STAND || current_configuration == M4Configurations::CROUCH1 || current_configuration == M4Configurations::CROUCH2 )
-										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
 									
 									ROS_WARN("Move to uav\n");
 									#ifndef DRY_RUN
@@ -593,39 +461,9 @@ int main(int argc, char **argv)
 										current_configuration = M4Configurations::UAV;
 									#endif
 
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_UAV);
 								}
 
 								break;
-
-							case UAVMode::MODE_UAV_READY:
-								// Move to UAV configuration if not already in it
-								if(current_configuration != M4Configurations::UAV)
-								{
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-
-									ROS_WARN("Move to uav\n");
-
-									if(current_configuration == M4Configurations::STAND || current_configuration == M4Configurations::CROUCH1 || current_configuration == M4Configurations::CROUCH2 )
-										teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_OUT);
-
-									#ifndef DRY_RUN
-										m4.uav();
-									#else
-										current_configuration = M4Configurations::UAV;
-									#endif
-
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-									std::this_thread::sleep_for(std::chrono::milliseconds(500));
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::TRANSFORM_UAV);
-								}
-								
-								if(teensy_cmd_flag != TeensyCmd::UAV_ENABLE)
-									teensy_cmd(teensy_cmd_pub, TeensyCmd::UAV_ENABLE);
-
-								break;		
 						}
 					}
 			
@@ -645,9 +483,9 @@ int main(int argc, char **argv)
 					}
 
 					// Override arm command if not in UAV mode and ready (teensy handed control back to pixhawk)
-					if((current_configuration != M4Configurations::UAV) || (uav_channel_state != UAVMode::MODE_UAV_READY))
+					if((current_configuration != M4Configurations::UAV))
 					{
-						ROS_ERROR("Not in UAV READY MODE. Disarming!");
+						ROS_ERROR("Not in UAV CONFIGURATION. Disarming!");
 						mavros_msgs::CommandBool arm_cmd;
 						arm_cmd.request.value = false;
 						if(arming_client.call(arm_cmd) && arm_cmd.response.success)
@@ -657,7 +495,6 @@ int main(int argc, char **argv)
 					}
 
 					break;
-
 			}
 			
 		}	
@@ -668,15 +505,9 @@ int main(int argc, char **argv)
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-	
-	// teensy_cmd(teensy_cmd_pub, TeensyCmd::DRIVE);
-	// teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-	// teensy_cmd(teensy_cmd_pub, TeensyCmd::WHEEL_IN);
 	#ifndef DRY_RUN
 		m4.sit();
 		while(m4.get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	#endif
-	// teensy_cmd(teensy_cmd_pub, TeensyCmd::STOP);
-
 }
 

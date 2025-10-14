@@ -42,7 +42,7 @@ struct RobotState
 class M4Base
 {
 	public:
-		M4Base(std::vector<int> active_joint_ids, bool log_status=false);
+		M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status=false);
 		~M4Base();
 		
 		bool is_moving();
@@ -58,8 +58,11 @@ class M4Base
 		void uav();
 		void mip();
 
+		// Wheels
+		void drive(float lin_vel_cmd, float ang_vel_cmd);
+
 	private:
-		DynamixelPositionInterface dxl;
+		DynamixelInterface dxl;
 		
 		std::vector<RobotState> robot_state;
 		std::mutex m_state;
@@ -74,20 +77,30 @@ class M4Base
 		std::vector<float> uav_step3_configuration;
 		std::vector<float> uav_step4_configuration;
 		std::vector<float> mip_configuration;
+		float wheel_radius;
+		float wheel_base;
+		std::vector<float> transition_wheel_vel_in;
+		std::vector<float> transition_wheel_vel_out;
 		std::vector<std::vector<float>> transform_stand_to_crouch;
 		std::vector<std::vector<float>> transform_stand_to_sit;
 		std::vector<std::vector<float>> transform_stand_to_uav;
 		std::vector<std::vector<float>> transform_stand_to_mip;
 
 		std::vector<float> get_active_joint_positions(const std::vector<float>& joint_positions);
+		std::vector<float> get_active_wheel_velocities(const std::vector<float>& wheel_velocities);
 
 	// Logging related variables and functions
 		bool log_status;
 		std::vector<int> all_joint_ids;
+		std::vector<int> all_wheel_ids;
 		std::vector<int> active_joint_ids;
+		std::vector<int> active_wheel_ids;
 		std::vector<std::string> all_joint_names;
+		std::vector<std::string> all_wheel_names;
 		std::vector<std::string> active_joint_names;
+		std::vector<std::string> active_wheel_names;
 		std::vector<std::string> get_active_joint_names();
+		std::vector<std::string> get_active_wheel_names();
 		std::thread log_thread;
 		std::string LOG_PATH;
 		int LOG_BUFFER_SIZE;
@@ -114,6 +127,7 @@ class M4Base
 		std::thread control_thread;
 		void active_sleep(double sleep_time);
 
+		void execute_drive();
 		void execute_stand(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_crouch1(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
 		void execute_crouch2(int& command_step, bool& command_active, std::chrono::_V2::system_clock::time_point& gait_start);
@@ -123,6 +137,12 @@ class M4Base
 
 		std::vector<float> joint_position_cmd;
 		std::vector<int> joint_position_cmd_ids;
+		std::vector<float> wheel_velocity_cmd;
+		std::mutex drive_cmd;
+		float linear_velocity_cmd;
+		float angular_velocity_cmd;
+		std::vector<int> wheel_velocity_cmd_ids;
+
 		float movement_time;
 };
 
