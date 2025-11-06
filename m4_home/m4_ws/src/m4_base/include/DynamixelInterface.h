@@ -144,6 +144,15 @@ class DynamixelInterface
 		DynamixelStatus dxl_status;
 
 		std::chrono::time_point<std::chrono::high_resolution_clock> clock_start;
+
+		// Sim variables for DRY_EXECUTION_MODE
+		#ifdef DRY_EXECUTION_MODE && (DRY_EXECUTION_MODE == true)
+			std::vector<float> sim_joint_positions;
+			std::vector<float> sim_joint_velocities;
+			std::vector<float> sim_joint_currents;
+			std::vector<float> sim_wheel_velocities;
+			float movement_speed;
+		#endif
 		
 		int connect(const int &baudrate);
 		int disconnect();
