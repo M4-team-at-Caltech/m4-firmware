@@ -169,8 +169,7 @@ void DynamixelInterface::init(const char* port, const int &baudrate, const std::
 	servo_names.insert(servo_names.end(), active_wheel_names.begin(), active_wheel_names.end());
 	
 	//---------------------------------------------------------------------------------------------------------------
-
-	#if defined(DRY_EXECUTION_MODE) && (DRY_EXECUTION_MODE == true)
+	#ifdef DRY_EXECUTION_MODE
 		connect(baudrate);
 		printf("[DRY_EXECUTION_MODE]: Connected to U2D2!");
 		for(int i = 0; i < active_joint_ids.size(); i++)
@@ -246,7 +245,7 @@ DynamixelInterface::~DynamixelInterface()
 
 int DynamixelInterface::connect(const int &baudrate)
 {
-	#if defined(DRY_EXECUTION_MODE) && (DRY_EXECUTION_MODE == true)
+	#ifdef DRY_EXECUTION_MODE
 		printf("[DRY_EXECUTION_MODE]: Succeeded to open the port");
 		printf("[DRY_EXECUTION_MODE]: Succeeded to change the baudrate");
 		for(int i = 0; i < active_joint_ids.size(); i++)
@@ -327,7 +326,7 @@ int DynamixelInterface::connect(const int &baudrate)
 int DynamixelInterface::disconnect()
 {
 	printf("\nDisconnecting from interface!\n");
-	#if defined(DRY_EXECUTION_MODE) && (DRY_EXECUTION_MODE == true)
+	#ifdef DRY_EXECUTION_MODE
 		for(int i = 0; i < active_joint_ids.size(); i++)
 			printf("[DRY_EXECUTION_MODE]: Dynamixel#%d has been successfully disconnected\n", active_joint_ids[i]);
 		for(int i = 0; i < active_wheel_ids.size(); i++)
@@ -390,7 +389,7 @@ int DynamixelInterface::disconnect()
 
 int DynamixelInterface::toggle_torque(std::vector<int> ids, bool state)
 {
-	#if defined(DRY_EXECUTION_MODE) && (DRY_EXECUTION_MODE == true)
+	#ifdef DRY_EXECUTION_MODE
 		for(int i = 0; i < ids.size(); i++)
 			printf("[DRY_EXECUTION_MODE]: Dynamixel#%d torque has been successfully toggled.\n", ids[i]);
 	#else
@@ -436,7 +435,7 @@ int DynamixelInterface::toggle_torque(std::vector<int> ids, bool state)
 
 DynamixelStatus DynamixelInterface::read_status()
 {
-	#if defined(DRY_EXECUTION_MODE) && (DRY_EXECUTION_MODE == true)
+	#ifdef DRY_EXECUTION_MODE
 		auto now = std::chrono::high_resolution_clock::now();
 		double timestamp = get_duration_secs(clock_start, now);
 
@@ -560,7 +559,7 @@ int DynamixelInterface::write_position(std::vector<int> ids, std::vector<float> 
         return 0;
 	}
 
-	#if defined(DRY_EXECUTION_MODE) && (DRY_EXECUTION_MODE == true)
+	#ifdef DRY_EXECUTION_MODE
 		// Convert positions from degrees to ticks and add zero offset
 		for(int i = 0; i < positions.size(); i++)
 		{
@@ -651,7 +650,7 @@ int DynamixelInterface::write_movement_speed(int id, float movement_speed)
 	// Convert speed from degrees per second to rotations per minute
 	movement_speed = movement_speed / MULT_SPEED;
 
-	#if defined(DRY_EXECUTION_MODE) && (DRY_EXECUTION_MODE == true)
+	#ifdef DRY_EXECUTION_MODE
 		this->movement_speed = movement_speed;
 	#else
 		int dxl_error = 0;
@@ -703,7 +702,7 @@ int DynamixelInterface::write_velocity(std::vector<int> ids, std::vector<float> 
         return 0;
 	}
 
-	#if defined(DRY_EXECUTION_MODE) && (DRY_EXECUTION_MODE == true)
+	#ifdef DRY_EXECUTION_MODE
 		// Convert velocities from degrees/s to ticks/s
 		for(int i = 0; i < velocities.size(); i++)
 		{
