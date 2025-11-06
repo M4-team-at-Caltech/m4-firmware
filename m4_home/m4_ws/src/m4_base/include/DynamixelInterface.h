@@ -146,7 +146,7 @@ class DynamixelInterface
 		std::chrono::time_point<std::chrono::high_resolution_clock> clock_start;
 
 		// Sim variables for DRY_EXECUTION_MODE
-		#ifdef DRY_EXECUTION_MODE && (DRY_EXECUTION_MODE == true)
+		#ifdef DRY_EXECUTION_MODE
 			std::vector<float> sim_joint_positions;
 			std::vector<float> sim_joint_velocities;
 			std::vector<float> sim_joint_currents;
