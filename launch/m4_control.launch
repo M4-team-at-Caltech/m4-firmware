@@ -1,0 +1,5 @@
+<launch>
+	
+	<node name="m4_controller" pkg="m4_base" type="m4_controller_node" output="screen"/>
+
+</launch>

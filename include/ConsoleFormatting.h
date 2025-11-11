@@ -1,0 +1,20 @@
+#ifndef CONSOLE_FORMATTING_H
+#define CONSOLE_FORMATTING_H
+
+#define CONSOLE_DEFAULT "\033[0m"
+#define CONSOLE_BLACK "\033[30m"
+#define CONSOLE_RED "\033[31m"
+#define CONSOLE_GREEN "\033[32m"
+#define CONSOLE_YELLOW "\033[33m"
+#define CONSOLE_BLUE "\033[34m"
+#define CONSOLE_MAGENTA "\033[35m"
+#define CONSOLE_CYAN "\033[36m"
+#define CONSOLE_WHITE "\033[37m"
+#define CONSOLE_BOLD "\033[1m"
+#define CONSOLE_UNDERLINE "\033[4m"
+
+#define CONSOLE_MSG_INFO "\033[0m"
+#define CONSOLE_MSG_ERROR "\033[31m"
+#define CONSOLE_MSG_WARN "\033[33m"
+
+#endif

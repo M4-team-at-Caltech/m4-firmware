@@ -1,6 +1,6 @@
-[submodule "m4_firmware/third-party/yaml-cpp"]
-	path = m4_firmware/third-party/yaml-cpp
+[submodule "third-party/yaml-cpp"]
+	path = third-party/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp.git
-[submodule "m4_firmware/third-party/DynamixelSDK"]
-	path = m4_firmware/third-party/DynamixelSDK
+[submodule "third-party/DynamixelSDK"]
+	path = third-party/DynamixelSDK
 	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
