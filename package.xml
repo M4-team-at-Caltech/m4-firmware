@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>m4_firmware</name>
+  <version>0.0.0</version>
+  <description>The m4_firmware package</description>
+
+  <maintainer email="adarshsalagame@gmail.com">adarsh</maintainer>
+
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>mavros_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
