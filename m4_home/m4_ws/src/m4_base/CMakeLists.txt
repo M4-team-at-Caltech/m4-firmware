@@ -5,7 +5,7 @@ project(m4_base)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
-set(DRY_EXECUTION_MODE ON CACHE BOOL "Enable dry execution mode" FORCE)
+set(DRY_EXECUTION_MODE OFF CACHE BOOL "Enable dry execution mode" FORCE)
 if(DRY_EXECUTION_MODE)
     add_compile_definitions(DRY_EXECUTION_MODE)
     message(STATUS "✓ DRY_EXECUTION_MODE is ENABLED")

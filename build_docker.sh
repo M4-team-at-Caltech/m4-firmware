@@ -7,6 +7,6 @@ DOCKERFILE_PATH="."
 IMAGE_NAME="m4:ROS-Noetic"
 
 # Build the Docker image
-docker build -t ${IMAGE_NAME} ${DOCKERFILE_PATH}
+docker build --network=host -t ${IMAGE_NAME} ${DOCKERFILE_PATH}
 
 echo "Image ${IMAGE_NAME} built successfully."

@@ -1,0 +1,18 @@
+Sourcing startup scripts
+Going to /home/jetson/m4-firmware
+/home/jetson/whiteM4/m4-firmware/startup.sh: line 9: cd: /home/jetson/m4-firmware: No such file or directory
+Creating two tmux sessions (interface, control)
+Starting docker on both of them
+Starting interfaces.launch on interface
+Starting m4_control.launch on control
+python3: can't open file '/home/jetson/whiteM4/m4-firmware/led/on.py': [Errno 2] No such file or directory
+Robot Operational !
+Sourcing startup scripts
+Going to /home/jetson/m4-firmware
+/home/jetson/whiteM4/m4-firmware/startup.sh: line 9: cd: /home/jetson/m4-firmware: No such file or directory
+Creating two tmux sessions (interface, control)
+Starting docker on both of them
+Starting interfaces.launch on interface
+Starting m4_control.launch on control
+python3: can't open file '/home/jetson/whiteM4/m4-firmware/led/on.py': [Errno 2] No such file or directory
+Robot Operational !

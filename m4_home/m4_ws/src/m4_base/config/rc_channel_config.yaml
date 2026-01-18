@@ -1,8 +1,28 @@
+###### CAST White m4 control manual #######
+# /mavros/in/rc id starts from 1
+#channel 5 -> left face SB (Stand/crouch1/crouch2)
+#channel 10 -> left face SC (Stand/-/Transform)
+#channel 9 -> right shouder SG (Disarm/Drive/Fly)
+
+# for any trigger:
+# ^ : outer
+# * : middle
+# v : inner
+
+## operation list ##
+## drive mode:
+# arm to drive mode -> change drive mode config -> drive -> disarm
+# SG(ARM): middle -> SB: change in 3 state -> right stick -> SG(ARM): outer
+
+## UAV mode:
+# arm to drive mode -> transform to UAV config -> arm to UAV mode -> fly,landing -> disarm(or trans to drive)
+# SG(ARM): middle -> SC: inner -> SG(ARM): inner -> fly control,left and right srick,landing -> SG(ARM): outer/middle
+
 drive_mode:
-    channel_id: 11
-    stand: 993
-    crouch1: 1497
-    crouch2: 1994
+    channel_id: 5
+    stand: 1094
+    crouch1: 1514
+    crouch2: 1934
 
 # mip_mode:
 #     channel_id: 8
@@ -11,26 +31,26 @@ drive_mode:
 #     mip_ready: 1934 
   
 uav_mode:
-    channel_id: 7
-    drive: 993
-    uav_transform: 1994
+    channel_id: 10
+    drive: 1094
+    uav_transform: 1934
     
 x_velocity:
     channel_id: 2
-    min: 983
-    zero: 1494
-    max: 2006
+    min: 1095
+    zero: 1527
+    max: 1934
 
 y_velocity:
     channel_id: 1
-    min: 983
-    zero: 1494
-    max: 2006
+    min: 1095
+    zero: 1527
+    max: 1934
 
 velocity_deadzone: 0.05 # 0-1: percentage of velocity range to assign as deadzone.
 
 arming:
-    channel_id: 12
-    disarm: 993
-    ground_mode_arm: 1497
-    aerial_mode_arm: 1994
+    channel_id: 9
+    disarm: 1094
+    ground_mode_arm: 1514
+    aerial_mode_arm: 1943
