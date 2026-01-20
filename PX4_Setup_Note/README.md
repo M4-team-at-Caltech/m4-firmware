@@ -52,7 +52,9 @@ Generic Quadrotor (X configuration)
 ### Board Orientation
 
 Set board mounting using:
+```bash
 SENS_BOARD_ROT
+```
 
 Current setting:
 - **Roll 180°, Yaw 270°**
@@ -64,8 +66,9 @@ This must match the physical mounting of the flight controller.
 ### Compass
 
 Enable magnetometer:
+```bash
 SYS_HAS_MAG = 1
-
+```
 
 ---
 
@@ -125,7 +128,7 @@ Verify motor number → physical position mapping.
 ### 4. Rotor Spin Direction (CW / CCW)
 
 #### H-Equivalent Geometry
-
+```bash
  {3}     {1}
     \   /
       O
@@ -134,7 +137,7 @@ Verify motor number → physical position mapping.
 
 Motors 1,2 : CCW
 Motors 3,4 : CW
-
+```
 
 #### Old QGC (<5.0.4)
 
@@ -161,12 +164,12 @@ Use **old QGC** for reliable configuration
 After modifying geometry or rotor direction, PX4 may automatically reverse outputs.
 
 Ensure all reversals are disabled:
-
+```bash
 PWM_AUX_REV1 = 0
 PWM_AUX_REV2 = 0
 PWM_AUX_REV3 = 0
 PWM_AUX_REV4 = 0
-
+```
 
 
 
