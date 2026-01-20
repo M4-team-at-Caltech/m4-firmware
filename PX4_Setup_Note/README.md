@@ -104,6 +104,7 @@ SYS_HAS_MAG = 1
 
 Configure via parameters:
 
+```bash
 PWM_AUX_TIM0 = DShot150
 PWM_AUX_FUNC1 = Motor1
 PWM_AUX_FUNC2 = Motor2
