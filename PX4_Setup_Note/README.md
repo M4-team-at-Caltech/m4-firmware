@@ -27,7 +27,7 @@ This document describes the **tested and working configuration** for running **P
 ---
 
 ## Airframe Configuration
-
+⚠️ **Issue remains**
 - **M4 requires H-type motor geometry**
 - PX4 **built-in H airframe fails pre-arm system health check** on Jetson ARK  
   (likely due to battery / power assumptions)
