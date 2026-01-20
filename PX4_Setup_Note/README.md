@@ -24,10 +24,10 @@ This document describes the **tested and working configuration** for running **P
 - Switch mapping depends on RC brand  
   - Example: *Reza’s preference with Futaba controller*
  
-  - SG -> ARM
-  - SD -> kill
-  - SE -> flight mode
-  - SA -> payload release
+    - SG -> ARM
+    - SD -> kill
+    - SE -> flight mode
+    - SA -> payload release
 
 ---
 
