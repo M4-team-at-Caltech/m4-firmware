@@ -110,7 +110,7 @@ PWM_AUX_FUNC1 = Motor1
 PWM_AUX_FUNC2 = Motor2
 PWM_AUX_FUNC3 = Motor3
 PWM_AUX_FUNC4 = Motor4
-```bash
+```
 
 
 
