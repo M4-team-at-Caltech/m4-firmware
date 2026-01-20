@@ -23,6 +23,11 @@ This document describes the **tested and working configuration** for running **P
 - Ask your drone pilot for **arm / trigger switch preference**
 - Switch mapping depends on RC brand  
   - Example: *Reza’s preference with Futaba controller*
+ 
+  - SG -> ARM
+  - SD -> kill
+  - SE -> flight mode
+  - SA -> payload release
 
 ---
 
@@ -88,7 +93,7 @@ SYS_HAS_MAG = 1
 
 ### 1. Program ESC
 
-- Configure ESC firmware to **DShot mode**
+- Configure ESC firmware to **DShot mode**,(
 
 ---
 
