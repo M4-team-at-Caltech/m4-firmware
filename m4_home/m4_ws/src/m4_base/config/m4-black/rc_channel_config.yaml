@@ -17,10 +17,10 @@
 
 
 drive_mode:
-    channel_id: 11
-    stand: 993
-    crouch1: 1497
-    crouch2: 1994
+    channel_id: 9
+    stand: 1094
+    crouch1: 1514
+    crouch2: 1934
 
 # mip_mode:
 #     channel_id: 8
@@ -29,9 +29,9 @@ drive_mode:
 #     mip_ready: 1934 
   
 uav_mode:
-    channel_id: 9
-    drive: 993
-    uav_transform: 1994
+    channel_id: 8
+    drive: 1094
+    uav_transform: 1934
 
     # 1094-1514-1934
     
@@ -50,7 +50,7 @@ y_velocity:
 velocity_deadzone: 0.05 # 0-1: percentage of velocity range to assign as deadzone.
 
 arming:
-    channel_id: 8
-    disarm: 993
-    ground_mode_arm: 1497
-    aerial_mode_arm: 1994
+    channel_id: 6
+    disarm: 1094
+    ground_mode_arm: 1514
+    aerial_mode_arm: 1934

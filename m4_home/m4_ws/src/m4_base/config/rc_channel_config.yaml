@@ -19,7 +19,7 @@
 # SG(ARM): middle -> SC: inner -> SG(ARM): inner -> fly control,left and right srick,landing -> SG(ARM): outer/middle
 
 drive_mode:
-    channel_id: 5
+    channel_id: 9
     stand: 1094
     crouch1: 1514
     crouch2: 1934
@@ -31,26 +31,29 @@ drive_mode:
 #     mip_ready: 1934 
   
 uav_mode:
-    channel_id: 10
+    channel_id: 8
     drive: 1094
     uav_transform: 1934
+
+    # 1094-1514-1934
     
 x_velocity:
     channel_id: 2
-    min: 1095
-    zero: 1527
+    min: 1094
+    zero: 1528
     max: 1934
 
 y_velocity:
     channel_id: 1
-    min: 1095
-    zero: 1527
+    min: 1094
+    zero: 1528
     max: 1934
 
 velocity_deadzone: 0.05 # 0-1: percentage of velocity range to assign as deadzone.
 
 arming:
-    channel_id: 9
+    channel_id: 6
     disarm: 1094
     ground_mode_arm: 1514
-    aerial_mode_arm: 1943
+    aerial_mode_arm: 1934
+
