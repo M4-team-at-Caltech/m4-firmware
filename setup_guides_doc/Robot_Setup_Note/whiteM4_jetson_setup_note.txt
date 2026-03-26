@@ -1,0 +1,184 @@
+White M4 Setup Guide (ROS1 Firmware)
+
+This repository contains the ROS1 firmware for the White M4 robot.
+
+Assume that you have already fully assembled your M4 robot.
+
+
+==============================
+1. Setup Jetson
+==============================
+On Jetson （Jetson Orin/Jetson-ARK/holybro）
+
+1. Clone repository
+
+git clone --recursive git@github.com:Taoran2023/m4-firmware.git
+
+
+2. Build Docker environment
+
+cd m4-firmware
+./build_docker.sh
+
+
+3. Configure USB rules
+
+cd setup_scripts
+
+# check and modify according to your Jetson board
+vim 11-local.rules
+
+./set_udev_rules
+
+IMPORTANT:
+Do NOT run docker or test any functionality before completing the following steps.
+
+
+
+==============================
+2. Configure Dynamixel Servos & RC data receiving
+==============================
+
+Config path:
+
+m4_home/m4_ws/src/m4_base/config/
+
+
+On Jetson:
+
+cd m4-firmware/m4_home/m4_ws/src/m4_base/config
+
+Notes:
+- Do NOT modify motor_config.yaml if also using Dynamixel XM540-W270-R
+- Modify rc_channel_config.yaml based on your preference
+- Also update RC mapping in PX4 QGroundControl
+- robot_config.yaml provides an example configuration
+
+
+On Laptop (Dynamixel Wizard):
+
+1. Disconnect U2D2 from Jetson and connect to laptop
+
+2. Assign servo IDs according to robot_config.yaml:
+PS:
+[1-8]   -> transform joints
+[9-12]  -> wheel joints
+
+
+3. Calibrate transform joints:
+
+- Move each servo in Dynamixel Wizard
+- Record:
+  zero_tick
+  min_tick
+  max_tick
+
+- Update robot_config.yaml
+
+IMPORTANT:
+zero_tick and min_tick should be recorded when robot is in stand configuration
+
+
+4. Wheel joints:
+
+- Set to velocity control mode
+
+
+
+==============================
+3. Setup Flight Controller
+==============================
+
+M4 uses PX4 as flight control software.
+
+Follow PX4_Setup_Note for details.
+
+
+
+==============================
+4. Verify Setup
+==============================
+
+4.1 Check RC input and MAVROS
+
+cd m4-firmware
+./run_docker
+
+Inside container:
+
+cd m4_ws
+source devel/setup.bash
+roslaunch m4_base interfaces.launch
+
+Check topics:
+
+rostopic list
+rostopic echo /your_rc_topic
+
+- Verify RC channels
+- Adjust rc_channel_config.yaml if needed
+
+
+
+4.2 Check servo configuration
+
+WARNING:
+Lift the robot off the ground before testing!
+
+cd m4-firmware
+./new_docker_terminal.sh
+
+Inside container:
+
+cd m4_ws
+source devel/setup.bash
+roslaunch m4_base m4_control.launch
+
+Expected:
+Robot transforms into stand mode
+
+If not:
+Re-check servo configuration
+
+
+
+4.3 Full pipeline test
+
+
+1. Shutdown container:
+
+cd m4-firmware
+./shutdown
+
+(or reboot system)
+
+2. Place robot on ground in crouch2 configuration:
+   - legs fully extended
+   - wheels perpendicular to ground
+
+3. Start system:
+
+./startup.sh
+
+Expected:
+- Robot becomes fully operational
+- RC control works
+
+
+
+==============================
+5. Startup Service
+==============================
+
+Refer to:
+
+start_up_note.txt
+
+
+
+==============================
+6. Final Notes
+==============================
+
+- Robot should boot automatically after reboot
+- Full startup time is about 2 minutes (Jetson boot time)
