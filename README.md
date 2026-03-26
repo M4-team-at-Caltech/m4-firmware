@@ -1,3 +1,6 @@
+# How to setup a robot
+Go to setup_guides_doc for more details.
+
 # How to connect to the robot
 The robot has to be powered on and connected to the same router as your laptop (host). You can ssh into the robot using the hostname:
 
