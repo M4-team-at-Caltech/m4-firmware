@@ -1,10 +1,15 @@
+#pragma once
+
 #include <string>
 #include <vector>
 #include <atomic>
 #include <yaml-cpp/yaml.h>
 #include <rclcpp/rclcpp.hpp>
-#include <mavros_msgs/RCIn.h>
-
+#include <mavros_msgs/msg/rc_in.hpp>
+#include <cmath>
+// using namespace std::chrono_literals;
+using std::placeholders::_1;
+// std::bind(&RCController::rc_callback, this, std::placeholders::_1)
 struct RadioSwitchConfig
 {
 	int channel_id;
@@ -43,18 +48,37 @@ struct RCstate{
 class RCController
 {
 	public:
-		RCController(ros::NodeHandle& nh): rc_state_available(false)
-		{
-			// Initialize ROS subscribers
-			rc_sub_ = nh.subscribe("/mavros/rc/in", 10, &RCController::rc_callback, this);
+		// TR: ROS1 remain
+		// RCController(ros::NodeHandle& nh): rc_state_available(false)
+		// {
+		// 	// Initialize ROS subscribers
+		// 	rc_sub_ = nh.subscribe("/mavros/rc/in", 10, &RCController::rc_callback, this);
 
-			// Read radio configuration
+		// 	// Read radio configuration
+		// 	read_radio_config("/config/rc_channel_config.yaml");
+		// }
+
+		//TR: 2 Update_1
+		RCController(rclcpp::Node* node) : rc_state_available(false)
+		{
+			rc_sub_ = node->create_subscription<mavros_msgs::msg::RCIn>(
+				"/mavros/rc/in",
+				10,
+				std::bind(&RCController::rc_callback, this, _1));
+
 			read_radio_config("/config/rc_channel_config.yaml");
 		}
-
 		// Getter for RC State
-		bool get_rc_state_available() const { return rc_state_available; }
-		RCstate get_rc_state() const { rc_state_available = false; return { drive_switch_state, uav_switch_state, arm_switch_state, velocity_joystick_state }; }
+		// bool get_rc_state_available() const { return rc_state_available; }
+		bool get_rc_state_available() const { return rc_state_available.load(); }
+		// TR: Wrong consist define
+		// RCstate get_rc_state() const { rc_state_available = false; return { drive_switch_state, uav_switch_state, arm_switch_state, velocity_joystick_state }; }
+
+		RCstate get_rc_state()
+		{
+			rc_state_available = false;
+			return {drive_switch_state, uav_switch_state, arm_switch_state, velocity_joystick_state};
+		}
 
 	private:
 		// Switch Configuration Variables
@@ -76,7 +100,8 @@ class RCController
 		// Joystick State Variables
 		VelocityJoystickState velocity_joystick_state;
 
-		rclcpp::Subscription::SharedPtr<mavros_msgs::msg::RCIn> rc_sub_;
+		// rclcpp::Subscription::SharedPtr<mavros_msgs::msg::RCIn> rc_sub_;
+		rclcpp::Subscription<mavros_msgs::msg::RCIn>::SharedPtr rc_sub_;
 		void rc_callback(const mavros_msgs::msg::RCIn::SharedPtr rc_msg);
 
 		// State updated flag

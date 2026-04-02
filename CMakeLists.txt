@@ -119,7 +119,7 @@ set(SCRIPTS
 )
 
 set(ROS_NODES
-	#m4_controller_node
+# 	m4_controller_node
 )
 
 set(COMMON_LIBRARIES
@@ -148,15 +148,24 @@ endforeach()
 
 # Set up ROS nodes
 foreach(SCRIPT IN LISTS ROS_NODES)
-    set(SOURCES ${PROJECT_SOURCE_DIR}/scripts/nodes/${SCRIPT}.cpp)
+    set(SOURCES ${PROJECT_SOURCE_DIR}/scripts/nodes/rc_teleop_controller/${SCRIPT}.cpp)
     compile_executable(${SCRIPT} "${SOURCES}" "${COMMON_LIBRARIES}" "${ROS_DEPENDENCIES}")
 endforeach()
+
+add_executable(m4_controller_node
+    ${PROJECT_SOURCE_DIR}/scripts/nodes/rc_teleop_controller/m4_controller_node.cpp
+    ${PROJECT_SOURCE_DIR}/scripts/nodes/rc_teleop_controller/src/RCcontroller.cpp
+)
+
+ament_target_dependencies(m4_controller_node ${ROS_DEPENDENCIES})
+target_link_libraries(m4_controller_node ${COMMON_LIBRARIES})
 
 # Install targets
 install(TARGETS
     ${UNIT_TEST_SCRIPTS}
 	${SCRIPTS}
 	${ROS_NODES}
+    m4_controller_node
     DESTINATION lib/${PROJECT_NAME}
 )
 
