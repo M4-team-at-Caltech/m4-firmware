@@ -5,7 +5,10 @@
 #include <atomic>
 #include <yaml-cpp/yaml.h>
 #include <rclcpp/rclcpp.hpp>
-#include <mavros_msgs/msg/rc_in.hpp>
+// #include <mavros_msgs/msg/rc_in.hpp>
+#include<px4_msgs/msg/input_rc.hpp>
+
+#include<iostream>
 #include <cmath>
 // using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -61,8 +64,8 @@ class RCController
 		//TR: 2 Update_1
 		RCController(rclcpp::Node* node) : rc_state_available(false)
 		{
-			rc_sub_ = node->create_subscription<mavros_msgs::msg::RCIn>(
-				"/mavros/rc/in",
+			rc_sub_ = node->create_subscription<px4_msgs::msg::InputRc>(
+				"/fmu/in/input_rc",
 				10,
 				std::bind(&RCController::rc_callback, this, _1));
 
@@ -101,8 +104,8 @@ class RCController
 		VelocityJoystickState velocity_joystick_state;
 
 		// rclcpp::Subscription::SharedPtr<mavros_msgs::msg::RCIn> rc_sub_;
-		rclcpp::Subscription<mavros_msgs::msg::RCIn>::SharedPtr rc_sub_;
-		void rc_callback(const mavros_msgs::msg::RCIn::SharedPtr rc_msg);
+		rclcpp::Subscription<px4_msgs::msg::InputRc>::SharedPtr rc_sub_;
+		void rc_callback(const px4_msgs::msg::InputRc::SharedPtr rc_msg);
 
 		// State updated flag
 		std::atomic<bool> rc_state_available;

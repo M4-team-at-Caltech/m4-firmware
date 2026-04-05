@@ -8,7 +8,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 # Dry execution mode
 set(DRY_EXECUTION_MODE ON CACHE BOOL "Enable dry execution mode" FORCE)
 if(DRY_EXECUTION_MODE)
-    add_compile_definitions(DRY_EXECUTION_MODE)
+    add_compile_definitions(DRY_EXECUTION_MODE)  
     message(STATUS "✓ DRY_EXECUTION_MODE is ENABLED")
 else()
     message(STATUS "✗ DRY_EXECUTION_MODE is DISABLED")
@@ -27,8 +27,10 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(mavros_msgs REQUIRED)
-set(ROS_DEPENDENCIES rclcpp std_msgs geometry_msgs mavros_msgs)
+find_package(px4_msgs REQUIRED)
+#find_package(mavros_msgs REQUIRED)
+
+set(ROS_DEPENDENCIES rclcpp std_msgs geometry_msgs px4_msgs )
 
 # Find other packages
 find_package(Threads REQUIRED)
@@ -170,8 +172,8 @@ install(TARGETS
 )
 
 # Install launch files, config files, etc. if you have any
-# install(DIRECTORY launch config
-#     DESTINATION share/${PROJECT_NAME}
-# )
+install(DIRECTORY launch config
+    DESTINATION share/${PROJECT_NAME}
+)
 
 ament_package()

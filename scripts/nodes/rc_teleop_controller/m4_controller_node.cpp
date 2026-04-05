@@ -5,16 +5,15 @@
 #include <thread>
 
 #include <rclcpp/rclcpp.hpp>
-// #include <ros/ros.h>
-// #include <mavros_msgs/RCIn.h>
-// #include <mavros_msgs/State.h>
-// #include <mavros_msgs/OverrideRCIn.h>
-// #include <mavros_msgs/CommandBool.h>
 
-#include <mavros_msgs/msg/state.hpp>
-#include <mavros_msgs/msg/rc_in.hpp>
-#include <mavros_msgs/msg/override_rc_in.hpp>
-#include <mavros_msgs/srv/command_bool.hpp>
+// #include <mavros_msgs/msg/state.hpp>
+// #include <mavros_msgs/msg/rc_in.hpp>
+// #include <mavros_msgs/msg/override_rc_in.hpp>
+// #include <mavros_msgs/srv/command_bool.hpp>
+
+#include<px4_msgs/msg/input_rc.hpp>
+#include<px4_msgs/msg/vehicle_status.hpp>
+#include <px4_msgs/msg/vehicle_command.hpp>
 
 #include <std_msgs/msg/u_int8.hpp>
 #include <geometry_msgs/msg/twist.hpp>
@@ -61,7 +60,7 @@ class M4ControllerNode : public rclcpp::Node
 			#ifndef DRY_RUN
 				m4 = new M4Base(active_joint_ids, active_wheel_ids, false);
 			#endif
-
+ 
 			// Define mode transition handlers
 			drive_mode_transition_handler = {
 				{ DriveSwitchState::STAND,   M4Configurations::STAND,   "Move to stand",   &M4Base::stand },
@@ -75,10 +74,14 @@ class M4ControllerNode : public rclcpp::Node
 
 			// Initialize ROS subscribers and publishers
 			timer_ = this->create_wall_timer(50ms, std::bind(&M4ControllerNode::loop, this));
-			state_subscriber_ = this->create_subscription<mavros_msgs::msg::State>(
-      						"/mavros/state", 10, std::bind(&M4ControllerNode::state_callback, this, _1));
-			arming_client_ = this->create_client<mavros_msgs::srv::CommandBool>("/mavros/cmd/arming");
-			rc_override_publisher_ = this->create_publisher<mavros_msgs::msg::OverrideRCIn>("/mavros/rc/override", 10);
+
+			state_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
+      						"/fmu/out/vehicle_status", 10, std::bind(&M4ControllerNode::state_callback, this, _1));
+
+			// arming_client_ = this->create_client<mavros_msgs::srv::CommandBool>("/mavros/cmd/arming");
+			vehicle_command_publisher_ =
+    						this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+			// rc_override_publisher_ = this->create_publisher<mavros_msgs::msg::OverrideRCIn>("/mavros/rc/override", 10);
 		}
 		// ~M4ControllerNode()
 		// {
@@ -117,12 +120,13 @@ class M4ControllerNode : public rclcpp::Node
 
 		rclcpp::TimerBase::SharedPtr timer_;
 
-		rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedPtr arming_client_;
-		rclcpp::Publisher<mavros_msgs::msg::OverrideRCIn>::SharedPtr rc_override_publisher_;
+		// rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedPtr arming_client_;
+		rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_publisher_;
+		// rclcpp::Publisher<mavros_msgs::msg::OverrideRCIn>::SharedPtr rc_override_publisher_;
 	
-		mavros_msgs::msg::State pixhawk_state;
-		rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_subscriber_;
-		void state_callback(const mavros_msgs::msg::State::SharedPtr msg){
+		px4_msgs::msg::VehicleStatus pixhawk_state;
+		rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr state_subscriber_;
+		void state_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg){
 			pixhawk_state = *msg;
 		}
 
@@ -219,28 +223,31 @@ class M4ControllerNode : public rclcpp::Node
 				}
 			}
 			else if(rc_state.arm_switch_state == ArmSwitchState::AERIAL_ARM){
-				if(pixhawk_state.armed){
+				if(pixhawk_state.arming_state == 2){
 					return; // Do nothing if already armed
 				}
 
 				// If not in UAV configuration, override arming. IMPORTANT SAFETY CHECK!
-				if(m4_configuration != M4Configurations::UAV)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Not in UAV CONFIGURATION. Disarming!");
-					auto arm_request = std::make_shared<mavros_msgs::srv::CommandBool::Request>();
-					arm_request->value = false;
-					auto future = arming_client_->async_send_request(arm_request);
-					// Wait for the result
-					if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future) ==
-						rclcpp::FutureReturnCode::SUCCESS)
-					{
-						auto response = future.get();
-						if (response->success)
-						{
-							RCLCPP_INFO(this->get_logger(), "Vehicle disarmed");
-						}
-					}
-				}
+
+				//  Disable now, foe testing funxtion
+
+				// if(m4_configuration != M4Configurations::UAV)
+				// {
+				// 	RCLCPP_ERROR(this->get_logger(), "Not in UAV CONFIGURATION. Disarming!");
+				// 	auto arm_request = std::make_shared<mavros_msgs::srv::CommandBool::Request>();
+				// 	arm_request->value = false;
+				// 	auto future = arming_client_->async_send_request(arm_request);
+				// 	// Wait for the result
+				// 	if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future) ==
+				// 		rclcpp::FutureReturnCode::SUCCESS)
+				// 	{
+				// 		auto response = future.get();
+				// 		if (response->success)
+				// 		{
+				// 			RCLCPP_INFO(this->get_logger(), "Vehicle disarmed");
+				// 		}
+				// 	}
+				// }
 			}
 		}
 };

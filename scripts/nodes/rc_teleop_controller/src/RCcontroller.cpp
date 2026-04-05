@@ -1,4 +1,5 @@
 #include "RCcontroller.h"
+using namespace std;
 
 void RCController::read_radio_config(const std::string& config_file)
 {
@@ -32,36 +33,37 @@ void RCController::read_radio_config(const std::string& config_file)
 	arm_switch_config.state3_pwm = config["arming"]["aerial_mode_arm"].as<int>();
 }
 
-void RCController::rc_callback(const mavros_msgs::msg::RCIn::SharedPtr rc_msg)
+void RCController::rc_callback(const px4_msgs::msg::InputRc::SharedPtr rc_msg)
 {
 	// Drive Channel
-	if (rc_msg->channels[drive_switch_config.channel_id-1] == drive_switch_config.state1_pwm) {
+	cout<<"RC_channel debug"<<rc_msg->values[xvel_config.channel_id-1]<<" "<<rc_msg->values[yvel_config.channel_id-1]<<std::endl;
+	if (rc_msg->values[drive_switch_config.channel_id-1] == drive_switch_config.state1_pwm) {
 		drive_switch_state = DriveSwitchState::STAND;
-	} else if (rc_msg->channels[drive_switch_config.channel_id-1] == drive_switch_config.state2_pwm) {
+	} else if (rc_msg->values[drive_switch_config.channel_id-1] == drive_switch_config.state2_pwm) {
 		drive_switch_state = DriveSwitchState::CROUCH1;
-	} else if (rc_msg->channels[drive_switch_config.channel_id-1] == drive_switch_config.state3_pwm) {
+	} else if (rc_msg->values[drive_switch_config.channel_id-1] == drive_switch_config.state3_pwm) {
 		drive_switch_state = DriveSwitchState::CROUCH2;
 	}
 
 	// UAV Channel
-	if (rc_msg->channels[uav_switch_config.channel_id-1] == uav_switch_config.state1_pwm) {
+	if (rc_msg->values[uav_switch_config.channel_id-1] == uav_switch_config.state1_pwm) {
 		uav_switch_state = UAVSwitchState::UAV_DISABLE;
-	} else if (rc_msg->channels[uav_switch_config.channel_id-1] == uav_switch_config.state2_pwm) {
+	} else if (rc_msg->values[uav_switch_config.channel_id-1] == uav_switch_config.state2_pwm) {
 		uav_switch_state = UAVSwitchState::UAV_TRANSFORM;
 	}
 
 	// ARM Channel
-	if (rc_msg->channels[arm_switch_config.channel_id-1] == arm_switch_config.state1_pwm) {
+	if (rc_msg->values[arm_switch_config.channel_id-1] == arm_switch_config.state1_pwm) {
 		arm_switch_state = ArmSwitchState::DISARM;
-	} else if (rc_msg->channels[arm_switch_config.channel_id-1] == arm_switch_config.state2_pwm) {
+	} else if (rc_msg->values[arm_switch_config.channel_id-1] == arm_switch_config.state2_pwm) {
 		arm_switch_state = ArmSwitchState::GROUND_ARM;
-	} else if (rc_msg->channels[arm_switch_config.channel_id-1] == arm_switch_config.state3_pwm) {
+	} else if (rc_msg->values[arm_switch_config.channel_id-1] == arm_switch_config.state3_pwm) {
 		arm_switch_state = ArmSwitchState::AERIAL_ARM;
 	}
 
 	// Velocity Joystick State normalized to [-1, 1]
-	velocity_joystick_state.x_velocity = float((-xvel_config.zero_pwm + rc_msg->channels[xvel_config.channel_id-1])) / (xvel_config.max_pwm - xvel_config.zero_pwm);
-	velocity_joystick_state.y_velocity = float(rc_msg->channels[yvel_config.channel_id-1] - yvel_config.zero_pwm) / (yvel_config.max_pwm - yvel_config.zero_pwm);
+	velocity_joystick_state.x_velocity = float((-xvel_config.zero_pwm + rc_msg->values[xvel_config.channel_id-1])) / (xvel_config.max_pwm - xvel_config.zero_pwm);
+	velocity_joystick_state.y_velocity = float(rc_msg->values[yvel_config.channel_id-1] - yvel_config.zero_pwm) / (yvel_config.max_pwm - yvel_config.zero_pwm);
 
 	// Apply deadzone
 	if (std::abs(velocity_joystick_state.x_velocity) <= xvel_config.deadzone)
