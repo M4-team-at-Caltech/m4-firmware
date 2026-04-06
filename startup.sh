@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# !!! not beeing used
+
 echo "Sourcing startup scripts"
 source /home/m4/.profile
 source /home/m4/.bashrc
