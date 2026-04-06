@@ -3,7 +3,7 @@ interface_port: "/dev/U2D2"
 
 baudrate: 2000000
 
-log_path: "/home/m4/data"
+log_path: "/home/jetson/log_temp"
 log_buffer_size: 4000
 
 control_loop_rate: 200
@@ -33,13 +33,13 @@ joints:
         id: 1              # Dynamixel motor ID
         zero_tick: 1180     # Encoder tick corresponding to zero degrees position
         min_tick: 1180      # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2280     # max_tick = max_position_degrees / 0.087891
+        max_tick: 2310     # max_tick = max_position_degrees / 0.087891
         speed: 27.27       # degrees per second
     FL_Saggital:           
         # Reverse drive mode - CW = +ve, CCW = -ve
         id: 2             # Dynamixel motor ID
-        zero_tick: 1060    # Encoder tick corresponding to zero degrees position
-        min_tick: 1060     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        zero_tick: 1080    # Encoder tick corresponding to zero degrees position
+        min_tick: 1080     # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 1900    # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60         # degrees per second
     
@@ -49,14 +49,14 @@ joints:
         id: 3              # Dynamixel motor ID
         zero_tick: 2000     # Encoder tick corresponding to zero degrees position
         min_tick: 2000      # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 3000     # max_tick = max_position_degrees / 0.087891
+        max_tick: 3150     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     FR_Saggital:
         id: 4              # Dynamixel motor ID
-        zero_tick: 950    # Encoder tick corresponding to zero degrees position
-        min_tick: 950     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2050     # max_tick = max_position_degrees / 0.087891 + zero_tick
-        speed: 60          # degrees per second
+        zero_tick: 1080    # Encoder tick corresponding to zero degrees position
+        min_tick: 1080     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 2280     # max_tick = max_position_degrees / 0.087891 + zero_tick
+        speed: 60  
 
     # BL Leg
     BL_Frontal:
@@ -68,9 +68,9 @@ joints:
         speed: 27.27       # degrees per second
     BL_Saggital:
         id: 6              # Dynamixel motor ID
-        zero_tick: 950    # Encoder tick corresponding to zero degrees position
-        min_tick: 950     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2150     # max_tick = max_position_degrees / 0.087891 + zero_tick
+        zero_tick: 1050    # Encoder tick corresponding to zero degrees position
+        min_tick: 1050     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 2040     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
 
     # BR Leg
@@ -78,13 +78,13 @@ joints:
         id: 7              # Dynamixel motor ID
         zero_tick: 880    # Encoder tick corresponding to zero degrees position
         min_tick: 880     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2000     # max_tick = max_position_degrees / 0.087891
+        max_tick: 2030     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     BR_Saggital:
         id: 8              # Dynamixel motor ID
-        zero_tick: 920    # Encoder tick corresponding to zero degrees position
-        min_tick: 920     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 2150     # max_tick = max_position_degrees / 0.087891 + zero_tick
+        zero_tick: 1058    # Encoder tick corresponding to zero degrees position
+        min_tick: 1058     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        max_tick: 2080     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
 
 # List of All wheel ids defined below. Acive wheel ids defined in executables

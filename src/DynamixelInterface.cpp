@@ -10,7 +10,7 @@
 #include "ConsoleFormatting.h"
 #include "DynamixelInterface.h"
 
-
+using namespace std;
 DynamixelInterface::DynamixelInterface()
 {
 	initialized = false;
@@ -209,6 +209,16 @@ void DynamixelInterface::init(const char* port, const int &baudrate, const std::
 			}
 		}
 
+		// add wheels
+		for(int i = 0; i < active_wheel_ids.size(); i++)
+		{
+			dxl_addparam_result = groupSyncRead->addParam(active_wheel_ids[i]);
+			if (dxl_addparam_result != true)
+			{
+				fprintf(stderr, "[ID:%03d] groupSyncRead addparam failed\n", active_wheel_ids[i]);
+				exit(1);
+			}
+		}
 		groupSyncWritePosition = new dynamixel::GroupSyncWrite(portHandler, packetHandler, ADDR_GOAL_POSITION, LEN_GOAL_POSITION);
 		groupSyncWriteMoveSpeed = new dynamixel::GroupSyncWrite(portHandler, packetHandler, ADDR_MOVEMENT_SPEED, LEN_MOVEMENT_SPEED);
 		groupSyncWriteVelocity = new dynamixel::GroupSyncWrite(portHandler, packetHandler, ADDR_GOAL_VELOCITY, LEN_GOAL_VELOCITY);
@@ -455,6 +465,8 @@ DynamixelStatus DynamixelInterface::read_status()
 		}
 
 	#else
+
+
 		int dxl_comm_result = COMM_TX_FAIL;
 		uint8_t dxl_error = 0;
 		bool dxl_getdata_result = false;
@@ -473,7 +485,7 @@ DynamixelStatus DynamixelInterface::read_status()
 		status.qw.resize(active_wheel_ids.size());
 		status.qdotw.resize(active_wheel_ids.size());
 		status.iw.resize(active_wheel_ids.size());
-		
+	
 		// Check for comms success
 		if (dxl_comm_result != COMM_SUCCESS)
 		{
@@ -497,7 +509,7 @@ DynamixelStatus DynamixelInterface::read_status()
 				printf("[ID:%03d] %s\n", active_wheel_ids[i], packetHandler->getRxPacketError(dxl_error));
 			}
 		}
-
+	
 		// Save data from buffer
 		for(int i = 0; i < active_joint_ids.size(); i++)
 		{
@@ -526,7 +538,7 @@ DynamixelStatus DynamixelInterface::read_status()
 			status.qdotw[i] = MULT_SPEED * twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_VELOCITY, LEN_PRESENT_VELOCITY), LEN_PRESENT_VELOCITY);
 			status.iw[i] = MULT_CURRENT * short(twos_complement(groupSyncRead->getData(active_wheel_ids[i], ADDR_PRESENT_CURRENT, LEN_PRESENT_CURRENT), LEN_PRESENT_CURRENT));
 		}
-
+	
 	#endif
 
 	return status;

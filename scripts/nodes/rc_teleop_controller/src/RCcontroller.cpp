@@ -36,7 +36,7 @@ void RCController::read_radio_config(const std::string& config_file)
 void RCController::rc_callback(const px4_msgs::msg::InputRc::SharedPtr rc_msg)
 {
 	// Drive Channel
-	cout<<"RC_channel debug"<<rc_msg->values[xvel_config.channel_id-1]<<" "<<rc_msg->values[yvel_config.channel_id-1]<<std::endl;
+	// cout<<"RC_channel debug"<<rc_msg->values[xvel_config.channel_id-1]<<" "<<rc_msg->values[yvel_config.channel_id-1]<<std::endl;
 	if (rc_msg->values[drive_switch_config.channel_id-1] == drive_switch_config.state1_pwm) {
 		drive_switch_state = DriveSwitchState::STAND;
 	} else if (rc_msg->values[drive_switch_config.channel_id-1] == drive_switch_config.state2_pwm) {

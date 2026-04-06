@@ -25,7 +25,7 @@
 // #define DRY_RUN
 using namespace std::chrono_literals;
 using std::placeholders::_1;
-
+using namespace std;
 struct DriveModeTransitionHandler
 {
 	DriveSwitchState state;
@@ -75,13 +75,21 @@ class M4ControllerNode : public rclcpp::Node
 			// Initialize ROS subscribers and publishers
 			timer_ = this->create_wall_timer(50ms, std::bind(&M4ControllerNode::loop, this));
 
-			state_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
-      						"/fmu/out/vehicle_status", 10, std::bind(&M4ControllerNode::state_callback, this, _1));
+			// adapted to /fmu qos
+			rclcpp::QoS px4_qos(10);
+			px4_qos.best_effort();
+			px4_qos.transient_local();
 
+			state_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
+				"/fmu/out/vehicle_status",
+				px4_qos,
+				std::bind(&M4ControllerNode::state_callback, this, _1));
+				
 			// arming_client_ = this->create_client<mavros_msgs::srv::CommandBool>("/mavros/cmd/arming");
 			vehicle_command_publisher_ =
     						this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
 			// rc_override_publisher_ = this->create_publisher<mavros_msgs::msg::OverrideRCIn>("/mavros/rc/override", 10);
+		cout<<"rc_controller_init"<<endl;
 		}
 		// ~M4ControllerNode()
 		// {
@@ -142,14 +150,19 @@ class M4ControllerNode : public rclcpp::Node
 
 				m4->stand();
 				while(m4->get_current_configuration() != M4Configurations::STAND) std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			#else
+				m4_configuration = m4->get_current_configuration();
+				
+				#else
 				m4_configuration = M4Configurations::STAND;
 			#endif
+			
 			RCLCPP_WARN(this->get_logger(), "M4 Controller Node Initialized!");
 		}
 
 		void loop()
 		{
+			// cout<<m4->get_current_configuration()<<" "<<m4_configuration<<endl;
+
 			if(m4_configuration == M4Configurations::INIT)
 				init_controller(); // Initialize controller on first run
 

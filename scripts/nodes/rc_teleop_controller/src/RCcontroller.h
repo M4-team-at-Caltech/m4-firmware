@@ -64,10 +64,19 @@ class RCController
 		//TR: 2 Update_1
 		RCController(rclcpp::Node* node) : rc_state_available(false)
 		{
+			// rc_sub_ = node->create_subscription<px4_msgs::msg::InputRc>(
+			// 	"/fmu/out/input_rc",
+			// 	10,
+			// 	std::bind(&RCController::rc_callback, this, _1));
+			rclcpp::QoS px4_qos(10);
+			px4_qos.best_effort();
+			px4_qos.transient_local();
+
 			rc_sub_ = node->create_subscription<px4_msgs::msg::InputRc>(
-				"/fmu/in/input_rc",
-				10,
-				std::bind(&RCController::rc_callback, this, _1));
+				"/fmu/out/input_rc",
+				px4_qos,
+				std::bind(&RCController::rc_callback, this, std::placeholders::_1));
+
 
 			read_radio_config("/config/rc_channel_config.yaml");
 		}

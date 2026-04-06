@@ -12,7 +12,7 @@
  */
 
 #include "M4Base.h"
-
+using namespace std;
 void M4Base::update_state()
 {
 	DynamixelStatus status = dxl.read_status();
