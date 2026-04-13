@@ -62,7 +62,7 @@ void RCController::rc_callback(const px4_msgs::msg::InputRc::SharedPtr rc_msg)
 	}
 
 	// Velocity Joystick State normalized to [-1, 1]
-	velocity_joystick_state.x_velocity = float((-xvel_config.zero_pwm + rc_msg->values[xvel_config.channel_id-1])) / (xvel_config.max_pwm - xvel_config.zero_pwm);
+	velocity_joystick_state.x_velocity = -1.0*float((-xvel_config.zero_pwm + rc_msg->values[xvel_config.channel_id-1])) / (xvel_config.max_pwm - xvel_config.zero_pwm);
 	velocity_joystick_state.y_velocity = float(rc_msg->values[yvel_config.channel_id-1] - yvel_config.zero_pwm) / (yvel_config.max_pwm - yvel_config.zero_pwm);
 
 	// Apply deadzone
