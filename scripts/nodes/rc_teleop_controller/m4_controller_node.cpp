@@ -236,9 +236,9 @@ class M4ControllerNode : public rclcpp::Node
 				}
 			}
 			else if(rc_state.arm_switch_state == ArmSwitchState::AERIAL_ARM){
-				if(pixhawk_state.arming_state == 2){
-					return; // Do nothing if already armed
-				}
+				// if(pixhawk_state.arming_state == 2){
+				// 	return; // Do nothing if already armed
+				// }
 
 				// If not in UAV configuration, override arming. IMPORTANT SAFETY CHECK!
 
