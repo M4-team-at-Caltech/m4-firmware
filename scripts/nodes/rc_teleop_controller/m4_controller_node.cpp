@@ -244,23 +244,22 @@ class M4ControllerNode : public rclcpp::Node
 
 				//  Disable now, foe testing funxtion
 
-				// if(m4_configuration != M4Configurations::UAV)
-				// {
-				// 	RCLCPP_ERROR(this->get_logger(), "Not in UAV CONFIGURATION. Disarming!");
-				// 	auto arm_request = std::make_shared<mavros_msgs::srv::CommandBool::Request>();
-				// 	arm_request->value = false;
-				// 	auto future = arming_client_->async_send_request(arm_request);
-				// 	// Wait for the result
-				// 	if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future) ==
-				// 		rclcpp::FutureReturnCode::SUCCESS)
-				// 	{
-				// 		auto response = future.get();
-				// 		if (response->success)
-				// 		{
-				// 			RCLCPP_INFO(this->get_logger(), "Vehicle disarmed");
-				// 		}
-				// 	}
-				// }
+				// If not in UAV configuration, override arming. IMPORTANT SAFETY CHECK!
+				if(m4_configuration != M4Configurations::UAV)
+				{
+					RCLCPP_ERROR(this->get_logger(), "Not in UAV CONFIGURATION. Disarming!");
+					px4_msgs::msg::VehicleCommand disarm_cmd{};
+					disarm_cmd.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+					disarm_cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM;
+					disarm_cmd.param1 = 0.0f; // 0 = disarm
+					disarm_cmd.target_system = 1;
+					disarm_cmd.target_component = 1;
+					disarm_cmd.source_system = 1;
+					disarm_cmd.source_component = 1;
+					disarm_cmd.from_external = true;
+					vehicle_command_publisher_->publish(disarm_cmd);
+					RCLCPP_INFO(this->get_logger(), "Disarm command sent to Pixhawk");
+				}
 			}
 		}
 };
