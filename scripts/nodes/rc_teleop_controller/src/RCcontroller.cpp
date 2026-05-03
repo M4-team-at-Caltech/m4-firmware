@@ -32,11 +32,11 @@ void RCController::read_radio_config(const std::string& config_file)
 	arm_switch_config.state2_pwm = config["arming"]["ground_mode_arm"].as<int>();
 	arm_switch_config.state3_pwm = config["arming"]["aerial_mode_arm"].as<int>();
 
-	// AUTO mode switch (2-state: manual / auto)
+	// AUTO mode switch (3-state, Option C: mid and high both map to AUTO)
 	auto_switch_config.channel_id = config["auto_mode"]["channel_id"].as<int>();
 	auto_switch_config.state1_pwm = config["auto_mode"]["manual_pwm"].as<int>();
-	auto_switch_config.state2_pwm = config["auto_mode"]["auto_pwm"].as<int>();
-	auto_switch_config.state3_pwm = 0; // unused
+	auto_switch_config.state2_pwm = config["auto_mode"]["mid_pwm"].as<int>();   // mid  → AUTO
+	auto_switch_config.state3_pwm = config["auto_mode"]["auto_pwm"].as<int>();  // high → AUTO
 }
 
 void RCController::rc_callback(const px4_msgs::msg::InputRc::SharedPtr rc_msg)
@@ -66,10 +66,11 @@ void RCController::rc_callback(const px4_msgs::msg::InputRc::SharedPtr rc_msg)
 		arm_switch_state = ArmSwitchState::AERIAL_ARM;
 	}
 
-	// AUTO mode switch (2-state)
+	// AUTO mode switch (Option C: low=MANUAL, mid=AUTO, high=AUTO)
 	if (rc_msg->values[auto_switch_config.channel_id-1] == auto_switch_config.state1_pwm) {
 		auto_switch_state = AutoSwitchState::MANUAL;
-	} else if (rc_msg->values[auto_switch_config.channel_id-1] == auto_switch_config.state2_pwm) {
+	} else if (rc_msg->values[auto_switch_config.channel_id-1] == auto_switch_config.state2_pwm ||
+	           rc_msg->values[auto_switch_config.channel_id-1] == auto_switch_config.state3_pwm) {
 		auto_switch_state = AutoSwitchState::AUTO;
 	}
 

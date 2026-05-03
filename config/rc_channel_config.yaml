@@ -62,7 +62,8 @@ arming:
 # manual: RC full control | auto: topic-driven control (/auto/mode_cmd, /auto/waypoint, /auto/cmd_vel)
 # NOTE: RC DISARM always overrides AUTO mode regardless of this switch
 auto_mode:
-    channel_id: 5     # placeholder - update after hardware verification
-    manual_pwm: 1094
-    auto_pwm:   1934
+    channel_id: 10     # placeholder - update after hardware verification
+    manual_pwm: 1094   # low  → MANUAL
+    mid_pwm:    1514   # mid  → AUTO  (Option C: mid and high both activate AUTO)
+    auto_pwm:   1934   # high → AUTO
 
