@@ -57,3 +57,12 @@ arming:
     ground_mode_arm: 1514
     aerial_mode_arm: 1934
 
+# AUTO mode switch (2-state)
+# channel_id: TBD - confirm during hardware testing which physical switch to use
+# manual: RC full control | auto: topic-driven control (/auto/mode_cmd, /auto/waypoint, /auto/cmd_vel)
+# NOTE: RC DISARM always overrides AUTO mode regardless of this switch
+auto_mode:
+    channel_id: 5     # placeholder - update after hardware verification
+    manual_pwm: 1094
+    auto_pwm:   1934
+

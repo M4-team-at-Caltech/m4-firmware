@@ -1,31 +1,41 @@
 #include <string>
 #include <vector>
 #include <atomic>
+#include <cmath>
+#include <limits>
 #include <yaml-cpp/yaml.h>
 #include <thread>
 
 #include <rclcpp/rclcpp.hpp>
 
-// #include <mavros_msgs/msg/state.hpp>
-// #include <mavros_msgs/msg/rc_in.hpp>
-// #include <mavros_msgs/msg/override_rc_in.hpp>
-// #include <mavros_msgs/srv/command_bool.hpp>
-
-#include<px4_msgs/msg/input_rc.hpp>
-#include<px4_msgs/msg/vehicle_status.hpp>
+#include <px4_msgs/msg/input_rc.hpp>
+#include <px4_msgs/msg/vehicle_status.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
+#include <px4_msgs/msg/vehicle_odometry.hpp>
+#include <px4_msgs/msg/offboard_control_mode.hpp>
+#include <px4_msgs/msg/trajectory_setpoint.hpp>
 
 #include <std_msgs/msg/u_int8.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+
+#include <custom_msgs/msg/m4_mode_cmd.hpp>
+
 #include "src/RCcontroller.h"
-// #include "RCcontroller.h"
 #include "M4Base.h"
 
 // #define DRY_RUN
 using namespace std::chrono_literals;
 using std::placeholders::_1;
 using namespace std;
+
+static constexpr float NaNf = std::numeric_limits<float>::quiet_NaN();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transition handler structs (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
 struct DriveModeTransitionHandler
 {
 	DriveSwitchState state;
@@ -42,66 +52,91 @@ struct UAVModeTransitionHandler
 	void (M4Base::*action)();
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// M4ControllerNode
+// ─────────────────────────────────────────────────────────────────────────────
 class M4ControllerNode : public rclcpp::Node
 {
-	// public:
-		// M4ControllerNode(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids) : Node("m4_controller_node"), 
-		// m4_configuration(M4Configurations::INIT)
-	public:
+public:
 	M4ControllerNode(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids)
 		: Node("m4_controller_node"),
-		m4_configuration(M4Configurations::INIT),
-		m4(nullptr),
-		rc_controller(this)
-		{
-			// rc_controller = RCController(this);
+		  m4_configuration(M4Configurations::INIT),
+		  m4(nullptr),
+		  rc_controller(this)
+	{
+		// Initialize M4 base class
+		#ifndef DRY_RUN
+			m4 = new M4Base(active_joint_ids, active_wheel_ids, false);
+		#endif
 
-			// Initialize M4 base class
-			#ifndef DRY_RUN
-				m4 = new M4Base(active_joint_ids, active_wheel_ids, false);
-			#endif
- 
-			// Define mode transition handlers
-			drive_mode_transition_handler = {
-				{ DriveSwitchState::STAND,   M4Configurations::STAND,   "Move to stand",   &M4Base::stand },
-				{ DriveSwitchState::CROUCH1, M4Configurations::CROUCH1, "Move to crouch1", &M4Base::crouch1 },
-				{ DriveSwitchState::CROUCH2, M4Configurations::CROUCH2, "Move to crouch2", &M4Base::crouch2 }
-			};
-			uav_mode_transition_handler = {
-				{ UAVSwitchState::UAV_DISABLE, M4Configurations::UAV, "Move to stand", &M4Base::stand },
-				{ UAVSwitchState::UAV_TRANSFORM, M4Configurations::UAV, "Move to uav", &M4Base::uav }
-			};
+		// Define mode transition handlers
+		drive_mode_transition_handler = {
+			{ DriveSwitchState::STAND,   M4Configurations::STAND,   "Move to stand",   &M4Base::stand   },
+			{ DriveSwitchState::CROUCH1, M4Configurations::CROUCH1, "Move to crouch1", &M4Base::crouch1 },
+			{ DriveSwitchState::CROUCH2, M4Configurations::CROUCH2, "Move to crouch2", &M4Base::crouch2 }
+		};
+		uav_mode_transition_handler = {
+			{ UAVSwitchState::UAV_DISABLE,   M4Configurations::UAV, "Move to stand", &M4Base::stand },
+			{ UAVSwitchState::UAV_TRANSFORM, M4Configurations::UAV, "Move to uav",   &M4Base::uav   }
+		};
 
-			// Initialize ROS subscribers and publishers
-			timer_ = this->create_wall_timer(50ms, std::bind(&M4ControllerNode::loop, this));
+		// ── 50 ms control timer ──
+		timer_ = this->create_wall_timer(50ms, std::bind(&M4ControllerNode::loop, this));
 
-			// adapted to /fmu qos
-			rclcpp::QoS px4_qos(10);
-			px4_qos.best_effort();
-			px4_qos.transient_local();
+		// ── PX4 QoS ──
+		rclcpp::QoS px4_qos(10);
+		px4_qos.best_effort();
+		px4_qos.transient_local();
 
-			state_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
-				"/fmu/out/vehicle_status",
-				px4_qos,
-				std::bind(&M4ControllerNode::state_callback, this, _1));
-				
-			// arming_client_ = this->create_client<mavros_msgs::srv::CommandBool>("/mavros/cmd/arming");
-			vehicle_command_publisher_ =
-    						this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
-			// rc_override_publisher_ = this->create_publisher<mavros_msgs::msg::OverrideRCIn>("/mavros/rc/override", 10);
-		cout<<"rc_controller_init"<<endl;
-		}
-		// ~M4ControllerNode()
-		// {
-		// 	#ifndef DRY_RUN
-		// 		m4->sit();
-		// 		while(m4->get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		// 	#endif
-		// 	delete m4;
-		// 	RCLCPP_WARN("M4 Controller Node Shutting Down!");
-		// }
-		~M4ControllerNode()
-		{
+		// ── Subscribers ──
+		state_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleStatus>(
+			"/fmu/out/vehicle_status", px4_qos,
+			std::bind(&M4ControllerNode::state_callback, this, _1));
+
+		// AUTO mode inputs
+		auto_mode_cmd_sub_ = this->create_subscription<custom_msgs::msg::M4ModeCmd>(
+			"/auto/mode_cmd", 10,
+			std::bind(&M4ControllerNode::mode_cmd_callback, this, _1));
+
+		auto_waypoint_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+			"/auto/waypoint", 10,
+			std::bind(&M4ControllerNode::waypoint_callback, this, _1));
+
+		auto_cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+			"/auto/cmd_vel", 10,
+			std::bind(&M4ControllerNode::cmd_vel_callback, this, _1));
+
+		// Visual odometry input (source configured in robot_config.yaml)
+		load_auto_config();
+		odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+			odom_topic_, 10,
+			std::bind(&M4ControllerNode::odom_callback, this, _1));
+
+		// ── Publishers ──
+		vehicle_command_publisher_ =
+			this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+
+		offboard_control_mode_pub_ =
+			this->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
+
+		trajectory_setpoint_pub_ =
+			this->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
+
+		// Odometry output topic depends on source type
+		const std::string odom_fmu_topic = (odom_source_ == "mocap")
+			? "/fmu/in/vehicle_mocap_odometry"
+			: "/fmu/in/vehicle_visual_odometry";
+		vehicle_odom_pub_ =
+			this->create_publisher<px4_msgs::msg::VehicleOdometry>(odom_fmu_topic, 10);
+
+		RCLCPP_INFO(this->get_logger(),
+			"[m4_controller_node] AUTO mode ready. odom_source=%s topic=%s fmu_out=%s",
+			odom_source_.c_str(), odom_topic_.c_str(), odom_fmu_topic.c_str());
+		cout << "rc_controller_init" << endl;
+	}
+
+	~M4ControllerNode()
+	{
 		#ifndef DRY_EXECUTION_MODE
 			if (m4 != nullptr) {
 				m4->sit();
@@ -112,196 +147,597 @@ class M4ControllerNode : public rclcpp::Node
 				m4 = nullptr;
 			}
 		#endif
-			RCLCPP_WARN(this->get_logger(), "M4 Controller Node Shutting Down!");
+		RCLCPP_WARN(this->get_logger(), "M4 Controller Node Shutting Down!");
+	}
+
+private:
+	// ── Hardware state ──
+	M4Configurations m4_configuration;
+	M4Base *m4;
+	std::vector<DriveModeTransitionHandler> drive_mode_transition_handler;
+	std::vector<UAVModeTransitionHandler>   uav_mode_transition_handler;
+
+	RCController rc_controller;
+	RCstate      rc_state;
+
+	rclcpp::TimerBase::SharedPtr timer_;
+
+	px4_msgs::msg::VehicleStatus pixhawk_state;
+	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr state_subscriber_;
+
+	rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_publisher_;
+
+	// ── AUTO mode: PX4 publishers ──
+	rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboard_control_mode_pub_;
+	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr  trajectory_setpoint_pub_;
+	rclcpp::Publisher<px4_msgs::msg::VehicleOdometry>::SharedPtr     vehicle_odom_pub_;
+
+	// ── AUTO mode: subscribers ──
+	rclcpp::Subscription<custom_msgs::msg::M4ModeCmd>::SharedPtr        auto_mode_cmd_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr   auto_waypoint_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr         auto_cmd_vel_sub_;
+	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr           odom_sub_;
+
+	// ── AUTO mode: config (loaded from robot_config.yaml) ──
+	std::string odom_source_{"fastlio"};
+	std::string odom_topic_{"/localization/odom"};
+	double      odom_timeout_s_{0.5};
+
+	// ── AUTO mode: runtime state ──
+	bool auto_mode_active_{false};
+	AutoSwitchState prev_auto_switch_{AutoSwitchState::MANUAL};
+
+	enum class AutoSubState { IDLE, GROUND, AERIAL };
+	AutoSubState auto_sub_state_{AutoSubState::IDLE};
+
+	// ── Odom health ──
+	bool         odom_healthy_{false};
+	rclcpp::Time last_odom_time_{0, 0, RCL_ROS_TIME};
+	nav_msgs::msg::Odometry last_odom_;
+
+	// ── Cached AUTO inputs ──
+	bool has_new_mode_cmd_{false};
+	custom_msgs::msg::M4ModeCmd latest_mode_cmd_;
+
+	bool         has_waypoint_{false};
+	rclcpp::Time last_waypoint_time_{0, 0, RCL_ROS_TIME};
+	geometry_msgs::msg::PoseStamped latest_waypoint_;
+	geometry_msgs::msg::PoseStamped hover_waypoint_;  // last valid setpoint for hover hold
+
+	bool         has_cmd_vel_{false};
+	rclcpp::Time last_cmd_vel_time_{0, 0, RCL_ROS_TIME};
+	geometry_msgs::msg::Twist latest_cmd_vel_;
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Config loader
+	// ─────────────────────────────────────────────────────────────────────────
+	void load_auto_config()
+	{
+		try {
+			std::string path = std::string(PROJECT_ROOT_DIR) + "/config/robot_config.yaml";
+			YAML::Node cfg  = YAML::LoadFile(path);
+			if (cfg["auto_mode"]) {
+				odom_source_    = cfg["auto_mode"]["odom_source"].as<std::string>(odom_source_);
+				odom_topic_     = cfg["auto_mode"]["odom_topic"].as<std::string>(odom_topic_);
+				odom_timeout_s_ = cfg["auto_mode"]["odom_timeout_s"].as<double>(odom_timeout_s_);
+			}
+		} catch (const std::exception& e) {
+			RCLCPP_WARN(this->get_logger(),
+				"[m4_controller_node] Could not load auto_mode config: %s. Using defaults.", e.what());
+		}
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Callbacks
+	// ─────────────────────────────────────────────────────────────────────────
+	void state_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
+	{
+		pixhawk_state = *msg;
+	}
+
+	void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
+	{
+		last_odom_      = *msg;
+		last_odom_time_ = this->now();
+		odom_healthy_   = true;
+
+		// Forward to PX4 (ENU → NED conversion)
+		vehicle_odom_pub_->publish(convert_odom_enu_to_ned(*msg));
+	}
+
+	void mode_cmd_callback(const custom_msgs::msg::M4ModeCmd::SharedPtr msg)
+	{
+		latest_mode_cmd_  = *msg;
+		has_new_mode_cmd_ = true;
+	}
+
+	void waypoint_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+	{
+		latest_waypoint_   = *msg;
+		last_waypoint_time_ = this->now();
+		has_waypoint_       = true;
+		hover_waypoint_     = *msg;  // keep last valid setpoint for hover hold
+	}
+
+	void cmd_vel_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
+	{
+		latest_cmd_vel_    = *msg;
+		last_cmd_vel_time_ = this->now();
+		has_cmd_vel_       = true;
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Init
+	// ─────────────────────────────────────────────────────────────────────────
+	void init_controller()
+	{
+		#ifndef DRY_RUN
+			m4->sit();
+			std::cout << "Sit complete!\n";
+			while (m4->get_current_configuration() != M4Configurations::SIT)
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+			m4->stand();
+			while (m4->get_current_configuration() != M4Configurations::STAND)
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			m4_configuration = m4->get_current_configuration();
+		#else
+			m4_configuration = M4Configurations::STAND;
+		#endif
+
+		RCLCPP_WARN(this->get_logger(), "M4 Controller Node Initialized!");
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// PX4 command helpers
+	// ─────────────────────────────────────────────────────────────────────────
+	void send_vehicle_command(uint16_t command, float param1 = 0.0f, float param2 = 0.0f)
+	{
+		px4_msgs::msg::VehicleCommand cmd{};
+		cmd.timestamp        = this->get_clock()->now().nanoseconds() / 1000;
+		cmd.command          = command;
+		cmd.param1           = param1;
+		cmd.param2           = param2;
+		cmd.target_system    = 1;
+		cmd.target_component = 1;
+		cmd.source_system    = 1;
+		cmd.source_component = 1;
+		cmd.from_external    = true;
+		vehicle_command_publisher_->publish(cmd);
+	}
+
+	void send_arm_command(bool arm)
+	{
+		send_vehicle_command(
+			px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM,
+			arm ? 1.0f : 0.0f);
+		RCLCPP_INFO(this->get_logger(), "[AUTO] UAV %s command sent to PX4",
+			arm ? "ARM" : "DISARM");
+	}
+
+	void send_offboard_mode_command()
+	{
+		// MAV_MODE_FLAG_CUSTOM_MODE_ENABLED=1, custom_mode=6 (offboard)
+		send_vehicle_command(
+			px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE,
+			1.0f, 6.0f);
+	}
+
+	// Publish OffboardControlMode heartbeat (must be >2 Hz while in offboard)
+	void publish_offboard_heartbeat()
+	{
+		px4_msgs::msg::OffboardControlMode msg{};
+		msg.timestamp    = this->get_clock()->now().nanoseconds() / 1000;
+		msg.position     = true;
+		msg.velocity     = false;
+		msg.acceleration = false;
+		msg.attitude     = false;
+		msg.body_rate    = false;
+		offboard_control_mode_pub_->publish(msg);
+	}
+
+	// Publish a position setpoint (NED frame)
+	void publish_trajectory_setpoint(const geometry_msgs::msg::PoseStamped& wp)
+	{
+		px4_msgs::msg::TrajectorySetpoint msg{};
+		msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+
+		// Waypoint is in ENU (ROS convention) → convert to NED for PX4
+		msg.position[0] =  (float)wp.pose.position.y;  // North
+		msg.position[1] =  (float)wp.pose.position.x;  // East
+		msg.position[2] = -(float)wp.pose.position.z;  // Down
+
+		// Let PX4 handle velocity/acceleration
+		msg.velocity[0]     = NaNf;
+		msg.velocity[1]     = NaNf;
+		msg.velocity[2]     = NaNf;
+		msg.acceleration[0] = NaNf;
+		msg.acceleration[1] = NaNf;
+		msg.acceleration[2] = NaNf;
+		msg.yaw             = NaNf;
+
+		trajectory_setpoint_pub_->publish(msg);
+	}
+
+	// Publish hover: hold last valid position, zero velocity
+	void publish_hover_setpoint()
+	{
+		publish_trajectory_setpoint(hover_waypoint_);
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Odometry conversion: ROS ENU/FLU → PX4 NED/FRD
+	// ─────────────────────────────────────────────────────────────────────────
+	px4_msgs::msg::VehicleOdometry convert_odom_enu_to_ned(
+		const nav_msgs::msg::Odometry& ros_odom)
+	{
+		px4_msgs::msg::VehicleOdometry px4_odom{};
+		px4_odom.timestamp        = this->get_clock()->now().nanoseconds() / 1000;
+		px4_odom.timestamp_sample = px4_odom.timestamp;
+
+		// Position: ENU → NED  (x=East→y, y=North→x, z=Up→-z)
+		px4_odom.position[0] =  (float)ros_odom.pose.pose.position.y;
+		px4_odom.position[1] =  (float)ros_odom.pose.pose.position.x;
+		px4_odom.position[2] = -(float)ros_odom.pose.pose.position.z;
+		px4_odom.pose_frame  = px4_msgs::msg::VehicleOdometry::POSE_FRAME_NED;
+
+		// Quaternion: ENU/FLU → NED/FRD
+		// Mapping: q_ned = (w, x→y, y→x, z→-z)
+		const auto& q       = ros_odom.pose.pose.orientation;
+		px4_odom.q[0]       =  (float)q.w;
+		px4_odom.q[1]       =  (float)q.y;
+		px4_odom.q[2]       =  (float)q.x;
+		px4_odom.q[3]       = -(float)q.z;
+
+		// Velocity: ENU → NED
+		px4_odom.velocity[0]     =  (float)ros_odom.twist.twist.linear.y;
+		px4_odom.velocity[1]     =  (float)ros_odom.twist.twist.linear.x;
+		px4_odom.velocity[2]     = -(float)ros_odom.twist.twist.linear.z;
+		px4_odom.velocity_frame  = px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED;
+
+		// Angular velocity: FLU → FRD (x→x, y→-y, z→-z)
+		px4_odom.angular_velocity[0] =  (float)ros_odom.twist.twist.angular.x;
+		px4_odom.angular_velocity[1] = -(float)ros_odom.twist.twist.angular.y;
+		px4_odom.angular_velocity[2] = -(float)ros_odom.twist.twist.angular.z;
+
+		// Variances: set to NaN (unknown) — PX4 will use its own defaults
+		for (int i = 0; i < 3; i++) {
+			px4_odom.position_variance[i]    = NaNf;
+			px4_odom.orientation_variance[i] = NaNf;
+			px4_odom.velocity_variance[i]    = NaNf;
 		}
 
-	private:
-		M4Configurations m4_configuration;
-		M4Base *m4;
-		// static const DriveModeTransitionHandler drive_mode_transition_handler[];
-		// static const UAVModeTransitionHandler uav_mode_transition_handler[];
-		std::vector<DriveModeTransitionHandler> drive_mode_transition_handler;
-		std::vector<UAVModeTransitionHandler> uav_mode_transition_handler;
+		px4_odom.quality = 1;
+		return px4_odom;
+	}
 
-		RCController rc_controller;
-		RCstate rc_state;
+	// ─────────────────────────────────────────────────────────────────────────
+	// AUTO mode — process incoming M4ModeCmd
+	//
+	//  mode 0 = STAND   → ground, stand configuration
+	//  mode 1 = UAV     → aerial, UAV configuration
+	//  mode 2 = CROUCH1 → ground, crouch1 configuration
+	//  mode 4 = CROUCH2 → ground, crouch2 configuration
+	// ─────────────────────────────────────────────────────────────────────────
+	void process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
+	{
+		const int mode = cmd.mode;
 
-		rclcpp::TimerBase::SharedPtr timer_;
-
-		// rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedPtr arming_client_;
-		rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_publisher_;
-		// rclcpp::Publisher<mavros_msgs::msg::OverrideRCIn>::SharedPtr rc_override_publisher_;
-	
-		px4_msgs::msg::VehicleStatus pixhawk_state;
-		rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr state_subscriber_;
-		void state_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg){
-			pixhawk_state = *msg;
-		}
-
-		void init_controller()
-		{
-			#ifndef DRY_RUN
-				// Initialize to stand configuration
-
-				m4->sit();
-				std::cout<<"Sit complete!\n";
-				while(m4->get_current_configuration() != M4Configurations::SIT) std::this_thread::sleep_for(std::chrono::milliseconds(100));
-				std::cout<<"Sit wait complete!\n";
-
-				m4->stand();
-				while(m4->get_current_configuration() != M4Configurations::STAND) std::this_thread::sleep_for(std::chrono::milliseconds(100));
-				m4_configuration = m4->get_current_configuration();
-				
+		// ── mode 1: UAV (aerial) ──────────────────────────────────────────
+		if (mode == 1) {
+			if (m4_configuration != M4Configurations::UAV) {
+				RCLCPP_WARN(this->get_logger(), "[AUTO] Move to uav");
+				#ifndef DRY_RUN
+					m4->drive(0, 0);
+					m4->uav();
+					m4_configuration = m4->get_current_configuration();
 				#else
+					m4_configuration = M4Configurations::UAV;
+				#endif
+			}
+			auto_sub_state_ = AutoSubState::AERIAL;
+
+			if (odom_healthy_) {
+				send_offboard_mode_command();
+				send_arm_command(true);
+				RCLCPP_INFO(this->get_logger(), "[AUTO] mode=UAV — ARM sent");
+			} else {
+				RCLCPP_ERROR(this->get_logger(),
+					"[AUTO] mode=UAV: No odometry! UAV ARM blocked. "
+					"Waiting for odom on: %s", odom_topic_.c_str());
+			}
+			return;
+		}
+
+		// ── Ground modes (STAND / CROUCH1 / CROUCH2) ─────────────────────
+		// If coming from UAV, trigger A2G transform first
+		if (m4_configuration == M4Configurations::UAV) {
+			RCLCPP_WARN(this->get_logger(), "[AUTO] A2G transform — move to stand");
+			#ifndef DRY_RUN
+				m4->drive(0, 0);
+				m4->stand();
+				m4_configuration = m4->get_current_configuration();
+			#else
 				m4_configuration = M4Configurations::STAND;
 			#endif
-			
-			RCLCPP_WARN(this->get_logger(), "M4 Controller Node Initialized!");
 		}
 
-		void loop()
-		{
-			// cout<<m4->get_current_configuration()<<" "<<m4_configuration<<endl;
+		// Then drive the target configuration via the existing handler table
+		struct { int mode_val; DriveSwitchState state; } mapping[] = {
+			{ 0, DriveSwitchState::STAND   },
+			{ 2, DriveSwitchState::CROUCH1 },
+			{ 4, DriveSwitchState::CROUCH2 },
+		};
 
-			if(m4_configuration == M4Configurations::INIT)
-				init_controller(); // Initialize controller on first run
-
-			if(!rc_controller.get_rc_state_available())
-				return; // No new RC state available. Do nothing.
-			
-			// Get the latest RC state
-			// RCstate rc_state = rc_controller.get_rc_state();
-			rc_state = rc_controller.get_rc_state();
-
-			if(rc_state.arm_switch_state == ArmSwitchState::DISARM){
-				// Stop moving and do nothing
-				#ifndef DRY_RUN 
-					m4->drive(0,0); 
-				#endif
-				return;
-			}
-
-			// Update current configuration
-			#ifndef DRY_RUN
-				m4_configuration = m4->get_current_configuration();
-			#endif
-
-
-			if(rc_state.arm_switch_state == ArmSwitchState::GROUND_ARM){
-				if(rc_state.uav_switch_state == UAVSwitchState::UAV_DISABLE)
-				{// Drive Mode
-					// Make any required transformations
-					for (const auto& handler : drive_mode_transition_handler)
-					{
-						if (rc_state.drive_switch_state == handler.state && m4_configuration != handler.configuration)
-						{
-							RCLCPP_WARN(this->get_logger(), "%s", handler.message);
-							
-							#ifndef DRY_RUN
-								(m4->*handler.action)();
-								m4_configuration = m4->get_current_configuration();
-							#else
-								m4_configuration = handler.configuration;
-							#endif
-
-							break;
-						}
-					}
-
-					// Drive with joystick velocities
+		for (const auto& m : mapping) {
+			if (mode != m.mode_val) continue;
+			for (const auto& handler : drive_mode_transition_handler) {
+				if (handler.state == m.state &&
+				    m4_configuration != handler.configuration)
+				{
+					RCLCPP_WARN(this->get_logger(), "[AUTO] %s", handler.message);
 					#ifndef DRY_RUN
-						m4->drive(rc_state.velocity_joystick_state.x_velocity, rc_state.velocity_joystick_state.y_velocity);
+						(m4->*handler.action)();
+						m4_configuration = m4->get_current_configuration();
+					#else
+						m4_configuration = handler.configuration;
 					#endif
 				}
-				else if(rc_state.uav_switch_state == UAVSwitchState::UAV_TRANSFORM)
-				{// UAV Mode
-					// Make any required transformations
-					for (const auto& handler : uav_mode_transition_handler)
-					{
-						if (rc_state.uav_switch_state == handler.state && m4_configuration != handler.configuration)
-						{
-							RCLCPP_WARN(this->get_logger(), "%s", handler.message);
-							
-							#ifndef DRY_RUN
-								m4->drive(0,0);
-								(m4->*handler.action)();
-								m4_configuration = m4->get_current_configuration();
-							#else
-								m4_configuration = handler.configuration;
-							#endif
+			}
+			auto_sub_state_ = AutoSubState::GROUND;
+			aerial_armed_   = false;
+			RCLCPP_INFO(this->get_logger(), "[AUTO] mode=%d applied", mode);
+			return;
+		}
 
-							break;
-						}
+		RCLCPP_WARN(this->get_logger(),
+			"[AUTO] Unknown mode value: %d (valid: 0=STAND 1=UAV 2=CROUCH1 4=CROUCH2)", mode);
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// AUTO mode — ground execution (cmd_vel driven)
+	// ─────────────────────────────────────────────────────────────────────────
+	void execute_auto_ground()
+	{
+		const double cmd_vel_age = (this->now() - last_cmd_vel_time_).seconds();
+		const bool   cmd_vel_ok  = has_cmd_vel_ && (cmd_vel_age < odom_timeout_s_);
+
+		#ifndef DRY_RUN
+			if (cmd_vel_ok) {
+				m4->drive(latest_cmd_vel_.linear.x, latest_cmd_vel_.angular.z);
+			} else {
+				m4->drive(0.0f, 0.0f);
+				if (has_cmd_vel_)
+					RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+						"[AUTO] cmd_vel timeout (%.2fs) — holding zero", cmd_vel_age);
+			}
+		#endif
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// AUTO mode — aerial execution (waypoint tracking, odom monitor)
+	// ─────────────────────────────────────────────────────────────────────────
+	void execute_auto_aerial()
+	{
+		// ── Odom health re-check ──
+		if (!odom_healthy_) {
+			RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+				"[AUTO] Odometry lost during flight! Holding hover position. "
+				"Recovery requires odom on: %s", odom_topic_.c_str());
+			publish_offboard_heartbeat();
+			publish_hover_setpoint();
+			return;
+		}
+
+		// ── Arm if odom just recovered and we're in AERIAL sub-state ──
+		// (handles case where odom was absent at mode_cmd time but arrived later)
+		// Note: arm command is idempotent in PX4 (re-arm while armed = no-op)
+		// This block only runs once after odom recovery — tracked via flag
+		if (!aerial_armed_) {
+			send_offboard_mode_command();
+			send_arm_command(true);
+			aerial_armed_ = true;
+		}
+
+		// ── Offboard heartbeat (mandatory >2 Hz) ──
+		publish_offboard_heartbeat();
+
+		// ── Waypoint tracking ──
+		const double wp_age = has_waypoint_
+			? (this->now() - last_waypoint_time_).seconds()
+			: std::numeric_limits<double>::max();
+
+		if (wp_age < odom_timeout_s_) {
+			publish_trajectory_setpoint(latest_waypoint_);
+		} else {
+			// Waypoint stale: hold last known position
+			publish_hover_setpoint();
+			if (has_waypoint_)
+				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+					"[AUTO] Waypoint timeout (%.2fs) — hovering at last setpoint", wp_age);
+		}
+	}
+
+	// Tracks whether UAV arm has been sent in current AERIAL session
+	bool aerial_armed_{false};
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Main control loop (50 ms)
+	// ─────────────────────────────────────────────────────────────────────────
+	void loop()
+	{
+		if (m4_configuration == M4Configurations::INIT)
+			init_controller();
+
+		if (!rc_controller.get_rc_state_available())
+			return;
+
+		rc_state = rc_controller.get_rc_state();
+
+		// ────────────────────────────────────────────────────────────────────
+		// [①] DISARM — highest priority, overrides everything including AUTO
+		// ────────────────────────────────────────────────────────────────────
+		if (rc_state.arm_switch_state == ArmSwitchState::DISARM) {
+			#ifndef DRY_RUN
+				m4->drive(0, 0);
+			#endif
+			// If aerial ARM was active, force disarm PX4 as well
+			if (auto_mode_active_ && auto_sub_state_ == AutoSubState::AERIAL && aerial_armed_) {
+				send_arm_command(false);
+				aerial_armed_ = false;
+			}
+			auto_mode_active_ = false;
+			auto_sub_state_   = AutoSubState::IDLE;
+			return;
+		}
+
+		// Update current configuration from hardware
+		#ifndef DRY_RUN
+			m4_configuration = m4->get_current_configuration();
+		#endif
+
+		// ────────────────────────────────────────────────────────────────────
+		// [②] AUTO switch transition detection
+		// ────────────────────────────────────────────────────────────────────
+		const bool just_entered_auto =
+			(prev_auto_switch_ == AutoSwitchState::MANUAL &&
+			 rc_state.auto_switch_state == AutoSwitchState::AUTO);
+
+		if (just_entered_auto) {
+			if (rc_state.arm_switch_state == ArmSwitchState::AERIAL_ARM) {
+				RCLCPP_WARN(this->get_logger(),
+					"[AUTO] Mode switch REJECTED: currently in AERIAL_ARM. "
+					"Land and disarm before enabling AUTO.");
+			} else {
+				auto_mode_active_ = true;
+				auto_sub_state_   = AutoSubState::IDLE;
+				aerial_armed_     = false;
+				RCLCPP_INFO(this->get_logger(), "[AUTO] AUTO mode activated");
+			}
+		}
+
+		// Switching back to MANUAL always allowed
+		if (rc_state.auto_switch_state == AutoSwitchState::MANUAL) {
+			if (auto_mode_active_) {
+				// Disarm UAV if in aerial AUTO
+				if (auto_sub_state_ == AutoSubState::AERIAL && aerial_armed_) {
+					send_arm_command(false);
+					aerial_armed_ = false;
+				}
+				auto_mode_active_ = false;
+				auto_sub_state_   = AutoSubState::IDLE;
+				RCLCPP_INFO(this->get_logger(), "[AUTO] AUTO mode deactivated — returning to MANUAL");
+			}
+		}
+
+		prev_auto_switch_ = rc_state.auto_switch_state;
+
+		// ── Odom health tick ──
+		if (odom_healthy_ &&
+		    (this->now() - last_odom_time_).seconds() > odom_timeout_s_) {
+			odom_healthy_ = false;
+			RCLCPP_ERROR(this->get_logger(),
+				"[AUTO] Odometry timeout! Source: %s topic: %s",
+				odom_source_.c_str(), odom_topic_.c_str());
+		}
+
+		// ────────────────────────────────────────────────────────────────────
+		// [③] AUTO mode
+		// ────────────────────────────────────────────────────────────────────
+		if (auto_mode_active_) {
+			// Process new mode command if arrived
+			if (has_new_mode_cmd_) {
+				has_new_mode_cmd_ = false;
+				process_mode_cmd(latest_mode_cmd_);
+			}
+
+			// Execute current sub-state
+			switch (auto_sub_state_) {
+				case AutoSubState::GROUND:
+					execute_auto_ground();
+					break;
+				case AutoSubState::AERIAL:
+					execute_auto_aerial();
+					break;
+				case AutoSubState::IDLE:
+				default:
+					break;
+			}
+			return; // Do not fall through to MANUAL logic
+		}
+
+		// ────────────────────────────────────────────────────────────────────
+		// [④] MANUAL mode (original logic, unchanged)
+		// ────────────────────────────────────────────────────────────────────
+		if (rc_state.arm_switch_state == ArmSwitchState::GROUND_ARM) {
+			if (rc_state.uav_switch_state == UAVSwitchState::UAV_DISABLE)
+			{// Drive Mode
+				// Make any required transformations
+				for (const auto& handler : drive_mode_transition_handler)
+				{
+					if (rc_state.drive_switch_state == handler.state &&
+					    m4_configuration != handler.configuration)
+					{
+						RCLCPP_WARN(this->get_logger(), "%s", handler.message);
+						#ifndef DRY_RUN
+							(m4->*handler.action)();
+							m4_configuration = m4->get_current_configuration();
+						#else
+							m4_configuration = handler.configuration;
+						#endif
+						break;
+					}
+				}
+				// Drive with joystick velocities
+				#ifndef DRY_RUN
+					m4->drive(rc_state.velocity_joystick_state.x_velocity,
+					          rc_state.velocity_joystick_state.y_velocity);
+				#endif
+			}
+			else if (rc_state.uav_switch_state == UAVSwitchState::UAV_TRANSFORM)
+			{// UAV Mode
+				// Make any required transformations
+				for (const auto& handler : uav_mode_transition_handler)
+				{
+					if (rc_state.uav_switch_state == handler.state &&
+					    m4_configuration != handler.configuration)
+					{
+						RCLCPP_WARN(this->get_logger(), "%s", handler.message);
+						#ifndef DRY_RUN
+							m4->drive(0, 0);
+							(m4->*handler.action)();
+							m4_configuration = m4->get_current_configuration();
+						#else
+							m4_configuration = handler.configuration;
+						#endif
+						break;
 					}
 				}
 			}
-			else if(rc_state.arm_switch_state == ArmSwitchState::AERIAL_ARM){
-				// if(pixhawk_state.arming_state == 2){
-				// 	return; // Do nothing if already armed
-				// }
-
-				// If not in UAV configuration, override arming. IMPORTANT SAFETY CHECK!
-
-				//  Disable now, foe testing funxtion
-
-				// If not in UAV configuration, override arming. IMPORTANT SAFETY CHECK!
-				if(m4_configuration != M4Configurations::UAV)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Not in UAV CONFIGURATION. Disarming!");
-					px4_msgs::msg::VehicleCommand disarm_cmd{};
-					disarm_cmd.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-					disarm_cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM;
-					disarm_cmd.param1 = 0.0f; // 0 = disarm
-					disarm_cmd.target_system = 1;
-					disarm_cmd.target_component = 1;
-					disarm_cmd.source_system = 1;
-					disarm_cmd.source_component = 1;
-					disarm_cmd.from_external = true;
-					vehicle_command_publisher_->publish(disarm_cmd);
-					RCLCPP_INFO(this->get_logger(), "Disarm command sent to Pixhawk");
-				}
+		}
+		else if (rc_state.arm_switch_state == ArmSwitchState::AERIAL_ARM) {
+			// If not in UAV configuration, override arming. IMPORTANT SAFETY CHECK!
+			if (m4_configuration != M4Configurations::UAV)
+			{
+				RCLCPP_ERROR(this->get_logger(), "Not in UAV CONFIGURATION. Disarming!");
+				send_arm_command(false);
+				RCLCPP_INFO(this->get_logger(), "Disarm command sent to Pixhawk");
 			}
 		}
+	}
 };
 
-// enum M4Mode
-// {
-// 	MODE_DRIVE,
-// 	MODE_MIP,
-// 	MODE_UAV
-// }current_mode;
-
-// float xvel_state;
-// float yvel_state;
-// float velocity_deadzone;
-
-// mavros_msgs::msg::State pixhawk_state;
-
-// bool rc_state_available;
-// bool pixhawk_state_available;
-// bool drive_mode;
-// bool teensy_ack;
-
-// void pixhawk_state_subscriber_callback(mavros_msgs::msg::State state_msg)
-// {
-// 	pixhawk_state = state_msg;
-// 	pixhawk_state_available = true;
-// }
-
+// ─────────────────────────────────────────────────────────────────────────────
 int main(int argc, char **argv)
 {
-	// rclcpp::init(argc, argv, "m4_controller_node");
 	rclcpp::init(argc, argv);
 
-	std::vector<int> active_joint_ids = {1,2,3,4,5,6,7,8};
-	std::vector<int> active_wheel_ids = {9,10,11,12};
+	std::vector<int> active_joint_ids = {1, 2, 3, 4, 5, 6, 7, 8};
+	std::vector<int> active_wheel_ids = {9, 10, 11, 12};
 
 	auto node = std::make_shared<M4ControllerNode>(active_joint_ids, active_wheel_ids);
 
 	rclcpp::spin(node);
-
 	rclcpp::shutdown();
-
 	return 0;
 }
-

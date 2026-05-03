@@ -126,3 +126,14 @@ config_uav_step2: [90, 0, 90, 0, 90, 0, 90, 0]
 config_uav: [90, 0, 90, 0, 90, 0, 90, 0]
 config_mip: [90, 45, 90, 45, 0, 90, 0, 90]
 config_transition_wheel_vel: 100  # In rev/min
+
+# AUTO mode: odometry source configuration
+# odom_source: "fastlio" | "mocap"
+#   fastlio -> subscribes to odom_topic, forwards to /fmu/in/vehicle_visual_odometry
+#   mocap   -> subscribes to odom_topic, forwards to /fmu/in/vehicle_mocap_odometry
+# odom_topic: ROS topic name for the odometry input (nav_msgs/Odometry)
+# odom_timeout_s: seconds without odom before declaring unhealthy (blocks aerial ARM)
+auto_mode:
+    odom_source: "fastlio"
+    odom_topic: "/localization/odom"
+    odom_timeout_s: 0.5

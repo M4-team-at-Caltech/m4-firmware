@@ -27,10 +27,13 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
+find_package(custom_msgs REQUIRED)
 #find_package(mavros_msgs REQUIRED)
 
-set(ROS_DEPENDENCIES rclcpp std_msgs geometry_msgs px4_msgs )
+set(ROS_DEPENDENCIES rclcpp std_msgs geometry_msgs nav_msgs trajectory_msgs px4_msgs custom_msgs)
 
 # Find other packages
 find_package(Threads REQUIRED)

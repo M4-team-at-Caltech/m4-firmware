@@ -33,7 +33,7 @@ void M4Base::execute_drive()
 	dxl.write_velocity(wheel_velocity_cmd_ids, wheel_velocity_cmd);
 
 }
-
+ 
 void M4Base::execute_stand()
 {
 	switch(current_configuration)
