@@ -80,8 +80,14 @@ public:
 			{ UAVSwitchState::UAV_TRANSFORM, M4Configurations::UAV, "Move to uav",   &M4Base::uav   }
 		};
 
-		// ── 50 ms control timer ──
+		// ── Timers ──
+		// 50 ms main control loop
 		timer_ = this->create_wall_timer(50ms, std::bind(&M4ControllerNode::loop, this));
+
+		// 10 Hz dedicated offboard heartbeat — runs independently of loop()
+		// guarantees >2 Hz even if loop() is delayed by init or early-returns
+		offboard_timer_ = this->create_wall_timer(
+			100ms, std::bind(&M4ControllerNode::offboard_heartbeat_callback, this));
 
 		// ── PX4 QoS ──
 		rclcpp::QoS px4_qos(10);
@@ -130,8 +136,8 @@ public:
 			this->create_publisher<px4_msgs::msg::VehicleOdometry>(odom_fmu_topic, 10);
 
 		RCLCPP_INFO(this->get_logger(),
-			"[m4_controller_node] AUTO mode ready. odom_source=%s topic=%s fmu_out=%s",
-			odom_source_.c_str(), odom_topic_.c_str(), odom_fmu_topic.c_str());
+			"[m4_controller_node] AUTO mode ready. odom_source=%s topic=%s fmu_out=%s descent=%.2fm/s",
+			odom_source_.c_str(), odom_topic_.c_str(), odom_fmu_topic.c_str(), descent_rate_mps_);
 		cout << "rc_controller_init" << endl;
 	}
 
@@ -160,35 +166,45 @@ private:
 	RCController rc_controller;
 	RCstate      rc_state;
 
-	rclcpp::TimerBase::SharedPtr timer_;
+	rclcpp::TimerBase::SharedPtr timer_;           // 50 ms main loop
+	rclcpp::TimerBase::SharedPtr offboard_timer_;  // 10 Hz offboard heartbeat
 
 	px4_msgs::msg::VehicleStatus pixhawk_state;
 	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr state_subscriber_;
 
-	rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_publisher_;
-
-	// ── AUTO mode: PX4 publishers ──
+	rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr      vehicle_command_publisher_;
 	rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboard_control_mode_pub_;
 	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr  trajectory_setpoint_pub_;
 	rclcpp::Publisher<px4_msgs::msg::VehicleOdometry>::SharedPtr     vehicle_odom_pub_;
 
 	// ── AUTO mode: subscribers ──
-	rclcpp::Subscription<custom_msgs::msg::M4ModeCmd>::SharedPtr        auto_mode_cmd_sub_;
-	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr   auto_waypoint_sub_;
-	rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr         auto_cmd_vel_sub_;
-	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr           odom_sub_;
+	rclcpp::Subscription<custom_msgs::msg::M4ModeCmd>::SharedPtr      auto_mode_cmd_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr  auto_waypoint_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr        auto_cmd_vel_sub_;
+	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr          odom_sub_;
 
-	// ── AUTO mode: config (loaded from robot_config.yaml) ──
+	// ── AUTO mode: config ──
 	std::string odom_source_{"fastlio"};
 	std::string odom_topic_{"/localization/odom"};
 	double      odom_timeout_s_{0.5};
+	double      descent_rate_mps_{0.3};  // downward speed (m/s) when odom is lost
 
-	// ── AUTO mode: runtime state ──
-	bool auto_mode_active_{false};
+	// ── AUTO mode: high-level state ──
+	bool            auto_mode_active_{false};
 	AutoSwitchState prev_auto_switch_{AutoSwitchState::MANUAL};
 
 	enum class AutoSubState { IDLE, GROUND, AERIAL };
 	AutoSubState auto_sub_state_{AutoSubState::IDLE};
+
+	// ── Offboard state machine ──
+	// Decoupled from loop() — drives the dedicated 10Hz heartbeat timer.
+	//   INACTIVE   : heartbeat not sent, PX4 not in offboard
+	//   TRACKING   : position control, publishes OffboardControlMode(position=true) + last setpoint
+	//   DESCENDING : velocity control, publishes OffboardControlMode(velocity=true) + descent cmd
+	//                entered when odom is lost mid-flight; NOT auto-cleared on odom recovery
+	//                (requires explicit mode_cmd=1 to resume TRACKING)
+	enum class OffboardState { INACTIVE, TRACKING, DESCENDING };
+	OffboardState offboard_state_{OffboardState::INACTIVE};
 
 	// ── Odom health ──
 	bool         odom_healthy_{false};
@@ -202,7 +218,7 @@ private:
 	bool         has_waypoint_{false};
 	rclcpp::Time last_waypoint_time_{0, 0, RCL_ROS_TIME};
 	geometry_msgs::msg::PoseStamped latest_waypoint_;
-	geometry_msgs::msg::PoseStamped hover_waypoint_;  // last valid setpoint for hover hold
+	geometry_msgs::msg::PoseStamped last_position_setpoint_;  // cache for heartbeat timer
 
 	bool         has_cmd_vel_{false};
 	rclcpp::Time last_cmd_vel_time_{0, 0, RCL_ROS_TIME};
@@ -217,9 +233,10 @@ private:
 			std::string path = std::string(PROJECT_ROOT_DIR) + "/config/robot_config.yaml";
 			YAML::Node cfg  = YAML::LoadFile(path);
 			if (cfg["auto_mode"]) {
-				odom_source_    = cfg["auto_mode"]["odom_source"].as<std::string>(odom_source_);
-				odom_topic_     = cfg["auto_mode"]["odom_topic"].as<std::string>(odom_topic_);
-				odom_timeout_s_ = cfg["auto_mode"]["odom_timeout_s"].as<double>(odom_timeout_s_);
+				odom_source_       = cfg["auto_mode"]["odom_source"].as<std::string>(odom_source_);
+				odom_topic_        = cfg["auto_mode"]["odom_topic"].as<std::string>(odom_topic_);
+				odom_timeout_s_    = cfg["auto_mode"]["odom_timeout_s"].as<double>(odom_timeout_s_);
+				descent_rate_mps_  = cfg["auto_mode"]["odom_lost_descent_mps"].as<double>(descent_rate_mps_);
 			}
 		} catch (const std::exception& e) {
 			RCLCPP_WARN(this->get_logger(),
@@ -253,10 +270,10 @@ private:
 
 	void waypoint_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 	{
-		latest_waypoint_   = *msg;
-		last_waypoint_time_ = this->now();
-		has_waypoint_       = true;
-		hover_waypoint_     = *msg;  // keep last valid setpoint for hover hold
+		latest_waypoint_        = *msg;
+		last_waypoint_time_     = this->now();
+		has_waypoint_           = true;
+		last_position_setpoint_ = *msg;  // keep last valid for heartbeat timer
 	}
 
 	void cmd_vel_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
@@ -319,50 +336,74 @@ private:
 	{
 		// MAV_MODE_FLAG_CUSTOM_MODE_ENABLED=1, custom_mode=6 (offboard)
 		send_vehicle_command(
-			px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE,
-			1.0f, 6.0f);
+			px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1.0f, 6.0f);
 	}
 
-	// Publish OffboardControlMode heartbeat (must be >2 Hz while in offboard)
-	void publish_offboard_heartbeat()
+	// Publish OffboardControlMode — position_mode=true → position ctrl,  false → velocity ctrl
+	void publish_offboard_control_mode(bool position_mode)
 	{
 		px4_msgs::msg::OffboardControlMode msg{};
 		msg.timestamp    = this->get_clock()->now().nanoseconds() / 1000;
-		msg.position     = true;
-		msg.velocity     = false;
+		msg.position     = position_mode;
+		msg.velocity     = !position_mode;
 		msg.acceleration = false;
 		msg.attitude     = false;
 		msg.body_rate    = false;
 		offboard_control_mode_pub_->publish(msg);
 	}
 
-	// Publish a position setpoint (NED frame)
+	// Publish position setpoint (ENU PoseStamped → NED TrajectorySetpoint)
 	void publish_trajectory_setpoint(const geometry_msgs::msg::PoseStamped& wp)
 	{
 		px4_msgs::msg::TrajectorySetpoint msg{};
-		msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-
-		// Waypoint is in ENU (ROS convention) → convert to NED for PX4
+		msg.timestamp   = this->get_clock()->now().nanoseconds() / 1000;
 		msg.position[0] =  (float)wp.pose.position.y;  // North
 		msg.position[1] =  (float)wp.pose.position.x;  // East
 		msg.position[2] = -(float)wp.pose.position.z;  // Down
-
-		// Let PX4 handle velocity/acceleration
-		msg.velocity[0]     = NaNf;
-		msg.velocity[1]     = NaNf;
-		msg.velocity[2]     = NaNf;
-		msg.acceleration[0] = NaNf;
-		msg.acceleration[1] = NaNf;
-		msg.acceleration[2] = NaNf;
-		msg.yaw             = NaNf;
-
+		msg.velocity[0] = msg.velocity[1] = msg.velocity[2]         = NaNf;
+		msg.acceleration[0] = msg.acceleration[1] = msg.acceleration[2] = NaNf;
+		msg.yaw         = NaNf;
 		trajectory_setpoint_pub_->publish(msg);
 	}
 
-	// Publish hover: hold last valid position, zero velocity
-	void publish_hover_setpoint()
+	// Publish controlled descent setpoint (velocity mode, no horizontal movement)
+	void publish_descent_setpoint()
 	{
-		publish_trajectory_setpoint(hover_waypoint_);
+		px4_msgs::msg::TrajectorySetpoint msg{};
+		msg.timestamp     = this->get_clock()->now().nanoseconds() / 1000;
+		msg.position[0]   = msg.position[1]   = msg.position[2]   = NaNf;
+		msg.velocity[0]   = 0.0f;  // North: no drift
+		msg.velocity[1]   = 0.0f;  // East:  no drift
+		msg.velocity[2]   = (float)descent_rate_mps_;  // Down: positive = descend (NED)
+		msg.acceleration[0] = msg.acceleration[1] = msg.acceleration[2] = NaNf;
+		msg.yaw           = NaNf;
+		trajectory_setpoint_pub_->publish(msg);
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// 10 Hz offboard heartbeat timer callback
+	// Publishes OffboardControlMode + setpoint according to offboard_state_.
+	// Runs independently of loop() to guarantee >2 Hz even when loop() is
+	// delayed by init, DISARM early-return, or other blocking work.
+	// ─────────────────────────────────────────────────────────────────────────
+	void offboard_heartbeat_callback()
+	{
+		switch (offboard_state_) {
+			case OffboardState::INACTIVE:
+				return;  // Not in offboard — send nothing
+
+			case OffboardState::TRACKING:
+				publish_offboard_control_mode(true);   // position=true
+				publish_trajectory_setpoint(last_position_setpoint_);
+				return;
+
+			case OffboardState::DESCENDING:
+				publish_offboard_control_mode(false);  // velocity=true
+				publish_descent_setpoint();
+				RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+					"[AUTO] DESCENDING — odom lost. Restore odom and resend mode_cmd=1 to resume.");
+				return;
+		}
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
@@ -381,32 +422,30 @@ private:
 		px4_odom.position[2] = -(float)ros_odom.pose.pose.position.z;
 		px4_odom.pose_frame  = px4_msgs::msg::VehicleOdometry::POSE_FRAME_NED;
 
-		// Quaternion: ENU/FLU → NED/FRD
-		// Mapping: q_ned = (w, x→y, y→x, z→-z)
-		const auto& q       = ros_odom.pose.pose.orientation;
-		px4_odom.q[0]       =  (float)q.w;
-		px4_odom.q[1]       =  (float)q.y;
-		px4_odom.q[2]       =  (float)q.x;
-		px4_odom.q[3]       = -(float)q.z;
+		// Quaternion: ENU/FLU → NED/FRD  (w, x→y, y→x, z→-z)
+		const auto& q = ros_odom.pose.pose.orientation;
+		px4_odom.q[0] =  (float)q.w;
+		px4_odom.q[1] =  (float)q.y;
+		px4_odom.q[2] =  (float)q.x;
+		px4_odom.q[3] = -(float)q.z;
 
 		// Velocity: ENU → NED
-		px4_odom.velocity[0]     =  (float)ros_odom.twist.twist.linear.y;
-		px4_odom.velocity[1]     =  (float)ros_odom.twist.twist.linear.x;
-		px4_odom.velocity[2]     = -(float)ros_odom.twist.twist.linear.z;
-		px4_odom.velocity_frame  = px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED;
+		px4_odom.velocity[0]    =  (float)ros_odom.twist.twist.linear.y;
+		px4_odom.velocity[1]    =  (float)ros_odom.twist.twist.linear.x;
+		px4_odom.velocity[2]    = -(float)ros_odom.twist.twist.linear.z;
+		px4_odom.velocity_frame = px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED;
 
 		// Angular velocity: FLU → FRD (x→x, y→-y, z→-z)
 		px4_odom.angular_velocity[0] =  (float)ros_odom.twist.twist.angular.x;
 		px4_odom.angular_velocity[1] = -(float)ros_odom.twist.twist.angular.y;
 		px4_odom.angular_velocity[2] = -(float)ros_odom.twist.twist.angular.z;
 
-		// Variances: set to NaN (unknown) — PX4 will use its own defaults
+		// Variances: NaN = unknown
 		for (int i = 0; i < 3; i++) {
 			px4_odom.position_variance[i]    = NaNf;
 			px4_odom.orientation_variance[i] = NaNf;
 			px4_odom.velocity_variance[i]    = NaNf;
 		}
-
 		px4_odom.quality = 1;
 		return px4_odom;
 	}
@@ -414,10 +453,10 @@ private:
 	// ─────────────────────────────────────────────────────────────────────────
 	// AUTO mode — process incoming M4ModeCmd
 	//
-	//  mode 0 = STAND   → ground, stand configuration
-	//  mode 1 = UAV     → aerial, UAV configuration
-	//  mode 2 = CROUCH1 → ground, crouch1 configuration
-	//  mode 4 = CROUCH2 → ground, crouch2 configuration
+	//  mode 0 = STAND   → ground
+	//  mode 1 = UAV     → aerial (arms PX4 if odom healthy)
+	//  mode 2 = CROUCH1 → ground
+	//  mode 4 = CROUCH2 → ground
 	// ─────────────────────────────────────────────────────────────────────────
 	void process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
 	{
@@ -440,17 +479,25 @@ private:
 			if (odom_healthy_) {
 				send_offboard_mode_command();
 				send_arm_command(true);
-				RCLCPP_INFO(this->get_logger(), "[AUTO] mode=UAV — ARM sent");
+				offboard_state_ = OffboardState::TRACKING;
+				RCLCPP_INFO(this->get_logger(), "[AUTO] mode=UAV → TRACKING, ARM sent");
 			} else {
+				offboard_state_ = OffboardState::INACTIVE;  // wait for odom to recover
 				RCLCPP_ERROR(this->get_logger(),
-					"[AUTO] mode=UAV: No odometry! UAV ARM blocked. "
-					"Waiting for odom on: %s", odom_topic_.c_str());
+					"[AUTO] mode=UAV: No odometry! ARM blocked. Waiting for odom on: %s",
+					odom_topic_.c_str());
 			}
 			return;
 		}
 
 		// ── Ground modes (STAND / CROUCH1 / CROUCH2) ─────────────────────
-		// If coming from UAV, trigger A2G transform first
+		// Deactivate offboard if we were in aerial
+		if (offboard_state_ != OffboardState::INACTIVE) {
+			send_arm_command(false);
+			offboard_state_ = OffboardState::INACTIVE;
+		}
+
+		// If coming from UAV config, trigger A2G transform first
 		if (m4_configuration == M4Configurations::UAV) {
 			RCLCPP_WARN(this->get_logger(), "[AUTO] A2G transform — move to stand");
 			#ifndef DRY_RUN
@@ -462,7 +509,7 @@ private:
 			#endif
 		}
 
-		// Then drive the target configuration via the existing handler table
+		// Drive target configuration via handler table
 		struct { int mode_val; DriveSwitchState state; } mapping[] = {
 			{ 0, DriveSwitchState::STAND   },
 			{ 2, DriveSwitchState::CROUCH1 },
@@ -485,7 +532,6 @@ private:
 				}
 			}
 			auto_sub_state_ = AutoSubState::GROUND;
-			aerial_armed_   = false;
 			RCLCPP_INFO(this->get_logger(), "[AUTO] mode=%d applied", mode);
 			return;
 		}
@@ -515,51 +561,45 @@ private:
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// AUTO mode — aerial execution (waypoint tracking, odom monitor)
+	// AUTO mode — aerial execution
+	// Note: heartbeat + setpoint publishing is handled entirely by offboard_timer_.
+	// This function only manages state transitions and updates the setpoint cache.
 	// ─────────────────────────────────────────────────────────────────────────
 	void execute_auto_aerial()
 	{
-		// ── Odom health re-check ──
-		if (!odom_healthy_) {
-			RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-				"[AUTO] Odometry lost during flight! Holding hover position. "
-				"Recovery requires odom on: %s", odom_topic_.c_str());
-			publish_offboard_heartbeat();
-			publish_hover_setpoint();
+		// If INACTIVE here, odom was absent at mode_cmd time. Poll for recovery.
+		if (offboard_state_ == OffboardState::INACTIVE) {
+			if (odom_healthy_) {
+				send_offboard_mode_command();
+				send_arm_command(true);
+				offboard_state_ = OffboardState::TRACKING;
+				RCLCPP_INFO(this->get_logger(),
+					"[AUTO] Odom recovered — ARM sent, switching to TRACKING");
+			} else {
+				RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+					"[AUTO] Waiting for odometry before arming...");
+			}
 			return;
 		}
 
-		// ── Arm if odom just recovered and we're in AERIAL sub-state ──
-		// (handles case where odom was absent at mode_cmd time but arrived later)
-		// Note: arm command is idempotent in PX4 (re-arm while armed = no-op)
-		// This block only runs once after odom recovery — tracked via flag
-		if (!aerial_armed_) {
-			send_offboard_mode_command();
-			send_arm_command(true);
-			aerial_armed_ = true;
+		// DESCENDING: heartbeat timer handles publishing, just log here
+		if (offboard_state_ == OffboardState::DESCENDING) {
+			return;
 		}
 
-		// ── Offboard heartbeat (mandatory >2 Hz) ──
-		publish_offboard_heartbeat();
-
-		// ── Waypoint tracking ──
+		// TRACKING: update position setpoint cache for the heartbeat timer
 		const double wp_age = has_waypoint_
 			? (this->now() - last_waypoint_time_).seconds()
 			: std::numeric_limits<double>::max();
 
 		if (wp_age < odom_timeout_s_) {
-			publish_trajectory_setpoint(latest_waypoint_);
-		} else {
-			// Waypoint stale: hold last known position
-			publish_hover_setpoint();
-			if (has_waypoint_)
-				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-					"[AUTO] Waypoint timeout (%.2fs) — hovering at last setpoint", wp_age);
+			last_position_setpoint_ = latest_waypoint_;
+		} else if (has_waypoint_) {
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+				"[AUTO] Waypoint timeout (%.2fs) — holding last position", wp_age);
+			// last_position_setpoint_ keeps its previous value → hover in place
 		}
 	}
-
-	// Tracks whether UAV arm has been sent in current AERIAL session
-	bool aerial_armed_{false};
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Main control loop (50 ms)
@@ -581,10 +621,9 @@ private:
 			#ifndef DRY_RUN
 				m4->drive(0, 0);
 			#endif
-			// If aerial ARM was active, force disarm PX4 as well
-			if (auto_mode_active_ && auto_sub_state_ == AutoSubState::AERIAL && aerial_armed_) {
+			if (offboard_state_ != OffboardState::INACTIVE) {
 				send_arm_command(false);
-				aerial_armed_ = false;
+				offboard_state_ = OffboardState::INACTIVE;
 			}
 			auto_mode_active_ = false;
 			auto_sub_state_   = AutoSubState::IDLE;
@@ -611,7 +650,7 @@ private:
 			} else {
 				auto_mode_active_ = true;
 				auto_sub_state_   = AutoSubState::IDLE;
-				aerial_armed_     = false;
+				offboard_state_   = OffboardState::INACTIVE;
 				RCLCPP_INFO(this->get_logger(), "[AUTO] AUTO mode activated");
 			}
 		}
@@ -619,10 +658,9 @@ private:
 		// Switching back to MANUAL always allowed
 		if (rc_state.auto_switch_state == AutoSwitchState::MANUAL) {
 			if (auto_mode_active_) {
-				// Disarm UAV if in aerial AUTO
-				if (auto_sub_state_ == AutoSubState::AERIAL && aerial_armed_) {
+				if (offboard_state_ != OffboardState::INACTIVE) {
 					send_arm_command(false);
-					aerial_armed_ = false;
+					offboard_state_ = OffboardState::INACTIVE;
 				}
 				auto_mode_active_ = false;
 				auto_sub_state_   = AutoSubState::IDLE;
@@ -639,31 +677,31 @@ private:
 			RCLCPP_ERROR(this->get_logger(),
 				"[AUTO] Odometry timeout! Source: %s topic: %s",
 				odom_source_.c_str(), odom_topic_.c_str());
+			// TRACKING → DESCENDING transition: odom lost mid-flight
+			if (offboard_state_ == OffboardState::TRACKING) {
+				offboard_state_ = OffboardState::DESCENDING;
+				RCLCPP_ERROR(this->get_logger(),
+					"[AUTO] Switching to DESCENDING mode (%.2f m/s). "
+					"Restore odom and resend mode_cmd=1 to resume TRACKING.",
+					descent_rate_mps_);
+			}
 		}
 
 		// ────────────────────────────────────────────────────────────────────
 		// [③] AUTO mode
 		// ────────────────────────────────────────────────────────────────────
 		if (auto_mode_active_) {
-			// Process new mode command if arrived
 			if (has_new_mode_cmd_) {
 				has_new_mode_cmd_ = false;
 				process_mode_cmd(latest_mode_cmd_);
 			}
-
-			// Execute current sub-state
 			switch (auto_sub_state_) {
-				case AutoSubState::GROUND:
-					execute_auto_ground();
-					break;
-				case AutoSubState::AERIAL:
-					execute_auto_aerial();
-					break;
+				case AutoSubState::GROUND:  execute_auto_ground(); break;
+				case AutoSubState::AERIAL:  execute_auto_aerial(); break;
 				case AutoSubState::IDLE:
-				default:
-					break;
+				default: break;
 			}
-			return; // Do not fall through to MANUAL logic
+			return;  // Do not fall through to MANUAL logic
 		}
 
 		// ────────────────────────────────────────────────────────────────────
@@ -672,7 +710,6 @@ private:
 		if (rc_state.arm_switch_state == ArmSwitchState::GROUND_ARM) {
 			if (rc_state.uav_switch_state == UAVSwitchState::UAV_DISABLE)
 			{// Drive Mode
-				// Make any required transformations
 				for (const auto& handler : drive_mode_transition_handler)
 				{
 					if (rc_state.drive_switch_state == handler.state &&
@@ -688,7 +725,6 @@ private:
 						break;
 					}
 				}
-				// Drive with joystick velocities
 				#ifndef DRY_RUN
 					m4->drive(rc_state.velocity_joystick_state.x_velocity,
 					          rc_state.velocity_joystick_state.y_velocity);
@@ -696,7 +732,6 @@ private:
 			}
 			else if (rc_state.uav_switch_state == UAVSwitchState::UAV_TRANSFORM)
 			{// UAV Mode
-				// Make any required transformations
 				for (const auto& handler : uav_mode_transition_handler)
 				{
 					if (rc_state.uav_switch_state == handler.state &&
@@ -717,8 +752,7 @@ private:
 		}
 		else if (rc_state.arm_switch_state == ArmSwitchState::AERIAL_ARM) {
 			// If not in UAV configuration, override arming. IMPORTANT SAFETY CHECK!
-			if (m4_configuration != M4Configurations::UAV)
-			{
+			if (m4_configuration != M4Configurations::UAV) {
 				RCLCPP_ERROR(this->get_logger(), "Not in UAV CONFIGURATION. Disarming!");
 				send_arm_command(false);
 				RCLCPP_INFO(this->get_logger(), "Disarm command sent to Pixhawk");

@@ -137,3 +137,4 @@ auto_mode:
     odom_source: "fastlio"
     odom_topic: "/localization/odom"
     odom_timeout_s: 0.5
+    odom_lost_descent_mps: 0.3   # controlled descent speed (m/s downward) when odom is lost
