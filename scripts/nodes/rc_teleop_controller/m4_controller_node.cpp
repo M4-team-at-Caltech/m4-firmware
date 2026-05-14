@@ -339,6 +339,16 @@ private:
 			px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1.0f, 6.0f);
 	}
 
+	// Switch PX4 back to STABILIZED mode (param2=7) so manual RC arming works again.
+	// Must be called whenever offboard_state_ transitions from non-INACTIVE to INACTIVE,
+	// otherwise PX4 stays in OFFBOARD flight mode and QGC requires manual mode switch.
+	void send_stabilized_mode_command()
+	{
+		send_vehicle_command(
+			px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1.0f, 7.0f);
+		RCLCPP_INFO(this->get_logger(), "[AUTO] PX4 flight mode → STABILIZED");
+	}
+
 	// Publish OffboardControlMode — position_mode=true → position ctrl,  false → velocity ctrl
 	void publish_offboard_control_mode(bool position_mode)
 	{
@@ -494,6 +504,7 @@ private:
 		// Deactivate offboard if we were in aerial
 		if (offboard_state_ != OffboardState::INACTIVE) {
 			send_arm_command(false);
+			send_stabilized_mode_command();  // exit OFFBOARD so manual RC arming works
 			offboard_state_ = OffboardState::INACTIVE;
 		}
 
@@ -623,6 +634,7 @@ private:
 			#endif
 			if (offboard_state_ != OffboardState::INACTIVE) {
 				send_arm_command(false);
+				send_stabilized_mode_command();  // exit OFFBOARD so manual RC arming works
 				offboard_state_ = OffboardState::INACTIVE;
 			}
 			auto_mode_active_ = false;
@@ -663,6 +675,7 @@ private:
 			if (auto_mode_active_) {
 				if (offboard_state_ != OffboardState::INACTIVE) {
 					send_arm_command(false);
+					send_stabilized_mode_command();  // exit OFFBOARD so manual RC arming works
 					offboard_state_ = OffboardState::INACTIVE;
 				}
 				auto_mode_active_ = false;
