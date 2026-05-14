@@ -135,6 +135,6 @@ config_transition_wheel_vel: 100  # In rev/min
 # odom_timeout_s: seconds without odom before declaring unhealthy (blocks aerial ARM)
 auto_mode:
     odom_source: "fastlio"
-    odom_topic: "/localization/odom"
+    odom_topic: "/fastlio/odom"
     odom_timeout_s: 0.5
     odom_lost_descent_mps: 0.3   # controlled descent speed (m/s downward) when odom is lost
