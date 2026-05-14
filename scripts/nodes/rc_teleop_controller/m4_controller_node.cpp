@@ -627,6 +627,9 @@ private:
 			}
 			auto_mode_active_ = false;
 			auto_sub_state_   = AutoSubState::IDLE;
+			// Reset prev_auto_switch_ so that re-arming with AUTO switch
+			// still in AUTO position correctly re-triggers AUTO mode activation.
+			prev_auto_switch_ = AutoSwitchState::MANUAL;
 			return;
 		}
 
