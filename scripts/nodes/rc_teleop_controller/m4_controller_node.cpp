@@ -188,6 +188,7 @@ private:
 	std::string odom_topic_{"/localization/odom"};
 	double      odom_timeout_s_{0.5};
 	double      descent_rate_mps_{0.3};  // downward speed (m/s) when odom is lost
+	double      uav_arm_wait_s_{5.0};    // wait after G2A transform before ARM (IMU settle)
 
 	// ── AUTO mode: high-level state ──
 	bool            auto_mode_active_{false};
@@ -195,6 +196,10 @@ private:
 
 	enum class AutoSubState { IDLE, GROUND, AERIAL };
 	AutoSubState auto_sub_state_{AutoSubState::IDLE};
+
+	// ── UAV ARM pending (non-blocking wait after G2A transform) ──
+	bool         arm_pending_{false};
+	rclcpp::Time arm_pending_since_{0, 0, RCL_ROS_TIME};
 
 	// ── Offboard state machine ──
 	// Decoupled from loop() — drives the dedicated 10Hz heartbeat timer.
@@ -237,6 +242,7 @@ private:
 				odom_topic_        = cfg["auto_mode"]["odom_topic"].as<std::string>(odom_topic_);
 				odom_timeout_s_    = cfg["auto_mode"]["odom_timeout_s"].as<double>(odom_timeout_s_);
 				descent_rate_mps_  = cfg["auto_mode"]["odom_lost_descent_mps"].as<double>(descent_rate_mps_);
+				uav_arm_wait_s_    = cfg["auto_mode"]["uav_arm_wait_s"].as<double>(uav_arm_wait_s_);
 			}
 		} catch (const std::exception& e) {
 			RCLCPP_WARN(this->get_logger(),
@@ -484,19 +490,13 @@ private:
 					m4_configuration = M4Configurations::UAV;
 				#endif
 			}
-			auto_sub_state_ = AutoSubState::AERIAL;
-
-			if (odom_healthy_) {
-				send_offboard_mode_command();
-				send_arm_command(true);
-				offboard_state_ = OffboardState::TRACKING;
-				RCLCPP_INFO(this->get_logger(), "[AUTO] mode=UAV → TRACKING, ARM sent");
-			} else {
-				offboard_state_ = OffboardState::INACTIVE;  // wait for odom to recover
-				RCLCPP_ERROR(this->get_logger(),
-					"[AUTO] mode=UAV: No odometry! ARM blocked. Waiting for odom on: %s",
-					odom_topic_.c_str());
-			}
+			auto_sub_state_    = AutoSubState::AERIAL;
+			offboard_state_    = OffboardState::INACTIVE;
+			arm_pending_       = true;
+			arm_pending_since_ = this->now();
+			RCLCPP_INFO(this->get_logger(),
+				"[AUTO] mode=UAV — G2A transform triggered. "
+				"Waiting %.1fs for IMU to settle before ARM.", uav_arm_wait_s_);
 			return;
 		}
 
@@ -578,17 +578,31 @@ private:
 	// ─────────────────────────────────────────────────────────────────────────
 	void execute_auto_aerial()
 	{
-		// If INACTIVE here, odom was absent at mode_cmd time. Poll for recovery.
+		// INACTIVE: either waiting for IMU settle timer, or waiting for odom recovery
 		if (offboard_state_ == OffboardState::INACTIVE) {
+			if (arm_pending_) {
+				const double elapsed = (this->now() - arm_pending_since_).seconds();
+				const double remaining = uav_arm_wait_s_ - elapsed;
+				if (remaining > 0.0) {
+					RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+						"[AUTO] ARM pending — IMU settling... %.1fs remaining", remaining);
+					return;
+				}
+				// Wait complete — clear pending flag and fall through to arm check
+				arm_pending_ = false;
+				RCLCPP_INFO(this->get_logger(), "[AUTO] IMU settle complete, checking odom for ARM");
+			}
+
+			// Attempt ARM (also handles odom-recovery re-arm after INACTIVE)
 			if (odom_healthy_) {
 				send_offboard_mode_command();
 				send_arm_command(true);
 				offboard_state_ = OffboardState::TRACKING;
-				RCLCPP_INFO(this->get_logger(),
-					"[AUTO] Odom recovered — ARM sent, switching to TRACKING");
+				RCLCPP_INFO(this->get_logger(), "[AUTO] ARM sent → TRACKING");
 			} else {
 				RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-					"[AUTO] Waiting for odometry before arming...");
+					"[AUTO] Waiting for odometry before arming... topic: %s",
+					odom_topic_.c_str());
 			}
 			return;
 		}
@@ -637,6 +651,7 @@ private:
 				send_stabilized_mode_command();  // exit OFFBOARD so manual RC arming works
 				offboard_state_ = OffboardState::INACTIVE;
 			}
+			arm_pending_      = false;
 			auto_mode_active_ = false;
 			auto_sub_state_   = AutoSubState::IDLE;
 			// Reset prev_auto_switch_ so that re-arming with AUTO switch
@@ -678,6 +693,7 @@ private:
 					send_stabilized_mode_command();  // exit OFFBOARD so manual RC arming works
 					offboard_state_ = OffboardState::INACTIVE;
 				}
+				arm_pending_      = false;
 				auto_mode_active_ = false;
 				auto_sub_state_   = AutoSubState::IDLE;
 				RCLCPP_INFO(this->get_logger(), "[AUTO] AUTO mode deactivated — returning to MANUAL");

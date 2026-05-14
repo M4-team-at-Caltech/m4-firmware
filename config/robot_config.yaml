@@ -138,3 +138,4 @@ auto_mode:
     odom_topic: "/fastlio/odom"
     odom_timeout_s: 0.5
     odom_lost_descent_mps: 0.3   # controlled descent speed (m/s downward) when odom is lost
+    uav_arm_wait_s: 5.0          # wait after UAV transform before sending ARM (IMU settle time)
