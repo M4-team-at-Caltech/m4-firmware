@@ -204,11 +204,13 @@ private:
 	// ── Offboard state machine ──
 	// Decoupled from loop() — drives the dedicated 10Hz heartbeat timer.
 	//   INACTIVE   : heartbeat not sent, PX4 not in offboard
+	//   PRE_ARM    : arm_pending_ wait period — heartbeat sent (position=true), no setpoint
+	//                Warms up PX4 offboard stream so ARM succeeds without health warnings
 	//   TRACKING   : position control, publishes OffboardControlMode(position=true) + last setpoint
 	//   DESCENDING : velocity control, publishes OffboardControlMode(velocity=true) + descent cmd
 	//                entered when odom is lost mid-flight; NOT auto-cleared on odom recovery
 	//                (requires explicit mode_cmd=1 to resume TRACKING)
-	enum class OffboardState { INACTIVE, TRACKING, DESCENDING };
+	enum class OffboardState { INACTIVE, PRE_ARM, TRACKING, DESCENDING };
 	OffboardState offboard_state_{OffboardState::INACTIVE};
 
 	// ── Odom health ──
@@ -408,6 +410,12 @@ private:
 			case OffboardState::INACTIVE:
 				return;  // Not in offboard — send nothing
 
+			case OffboardState::PRE_ARM:
+				// Warm up the offboard stream during IMU settle wait.
+				// PX4 requires OffboardControlMode for a stable period before ARM.
+				publish_offboard_control_mode(true);   // position=true
+				return;  // No setpoint yet — ARM hasn't been sent
+
 			case OffboardState::TRACKING:
 				publish_offboard_control_mode(true);   // position=true
 				publish_trajectory_setpoint(last_position_setpoint_);
@@ -491,12 +499,14 @@ private:
 				#endif
 			}
 			auto_sub_state_    = AutoSubState::AERIAL;
-			offboard_state_    = OffboardState::INACTIVE;
+			offboard_state_    = OffboardState::PRE_ARM;  // start heartbeat immediately
 			arm_pending_       = true;
 			arm_pending_since_ = this->now();
+			send_offboard_mode_command();  // request OFFBOARD mode early so stream warms up
 			RCLCPP_INFO(this->get_logger(),
 				"[AUTO] mode=UAV — G2A transform triggered. "
-				"Waiting %.1fs for IMU to settle before ARM.", uav_arm_wait_s_);
+				"Offboard heartbeat started. Waiting %.1fs for IMU to settle before ARM.",
+				uav_arm_wait_s_);
 			return;
 		}
 
@@ -578,8 +588,9 @@ private:
 	// ─────────────────────────────────────────────────────────────────────────
 	void execute_auto_aerial()
 	{
-		// INACTIVE: either waiting for IMU settle timer, or waiting for odom recovery
-		if (offboard_state_ == OffboardState::INACTIVE) {
+		// PRE_ARM / INACTIVE: waiting for IMU settle timer or odom recovery before ARM
+		if (offboard_state_ == OffboardState::PRE_ARM ||
+		    offboard_state_ == OffboardState::INACTIVE) {
 			if (arm_pending_) {
 				const double elapsed = (this->now() - arm_pending_since_).seconds();
 				const double remaining = uav_arm_wait_s_ - elapsed;
