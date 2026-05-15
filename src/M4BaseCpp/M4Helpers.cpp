@@ -117,7 +117,7 @@ void RobotState::print()
 	std::cout << std::endl;
 
 	std::cout << "Wheel state:" << std::endl;
-	std::cout << "qw: "; for(int i=0; i<ql.size(); i++) std::cout << qw[i] << " "; std::cout << std::endl;
+	std::cout << "qw: "; for(int i=0; i<qw.size(); i++) std::cout << qw[i] << " "; std::cout << std::endl;
 	std::cout << "qdotw: "; for(int i=0; i<qdotw.size(); i++) std::cout << qdotw[i] << " "; std::cout << std::endl;
 	std::cout << "iw: "; for(int i=0; i<iw.size(); i++) std::cout << iw[i] << " "; std::cout << std::endl;
 	std::cout << std::endl;
