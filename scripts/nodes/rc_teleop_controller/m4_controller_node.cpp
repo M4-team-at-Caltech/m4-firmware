@@ -657,14 +657,18 @@ private:
 			// Fresh waypoint from upstream planner — track it
 			last_position_setpoint_ = latest_waypoint_;
 		} else {
-			// Waypoint stale (> waypoint_timeout_s_) or never received.
-			// Hover at current odom position (updated every tick so PX4 holds position).
+			// Waypoint stale or never received — hover at current odom position.
 			// If odom also becomes unhealthy, loop() transitions to DESCENDING.
 			if (odom_healthy_) {
 				last_position_setpoint_ = odom_to_posestamped();
-				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-					"[AUTO] Waypoint timeout (%.2fs > %.2fs) — hovering at odom position",
-					wp_age, waypoint_timeout_s_);
+				if (!has_waypoint_) {
+					RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+						"[AUTO] No waypoint received — hovering at odom position");
+				} else {
+					RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+						"[AUTO] Waypoint timeout (%.2fs > %.2fs) — hovering at odom position",
+						wp_age, waypoint_timeout_s_);
+				}
 			}
 			// !odom_healthy_ → loop() odom tick already triggers TRACKING → DESCENDING
 		}
