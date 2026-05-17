@@ -189,6 +189,7 @@ private:
 	double      odom_timeout_s_{0.5};
 	double      descent_rate_mps_{0.3};  // downward speed (m/s) when odom is lost
 	double      uav_arm_wait_s_{5.0};    // wait after G2A transform before ARM (IMU settle)
+	double      waypoint_timeout_s_{2.0}; // aerial waypoint staleness threshold; hover at odom if exceeded
 
 	// ── AUTO mode: high-level state ──
 	bool            auto_mode_active_{false};
@@ -244,7 +245,8 @@ private:
 				odom_topic_        = cfg["auto_mode"]["odom_topic"].as<std::string>(odom_topic_);
 				odom_timeout_s_    = cfg["auto_mode"]["odom_timeout_s"].as<double>(odom_timeout_s_);
 				descent_rate_mps_  = cfg["auto_mode"]["odom_lost_descent_mps"].as<double>(descent_rate_mps_);
-				uav_arm_wait_s_    = cfg["auto_mode"]["uav_arm_wait_s"].as<double>(uav_arm_wait_s_);
+				uav_arm_wait_s_      = cfg["auto_mode"]["uav_arm_wait_s"].as<double>(uav_arm_wait_s_);
+			waypoint_timeout_s_  = cfg["auto_mode"]["waypoint_timeout_s"].as<double>(waypoint_timeout_s_);
 			}
 		} catch (const std::exception& e) {
 			RCLCPP_WARN(this->get_logger(),
@@ -430,6 +432,23 @@ private:
 		}
 	}
 
+	// Build a PoseStamped hover setpoint from the latest odom (ENU frame).
+	// Used to initialise last_position_setpoint_ at ARM time and during waypoint timeout.
+	geometry_msgs::msg::PoseStamped odom_to_posestamped() const
+	{
+		geometry_msgs::msg::PoseStamped ps;
+		ps.header.stamp    = last_odom_.header.stamp;
+		ps.header.frame_id = "map";
+		ps.pose            = last_odom_.pose.pose;
+		// Ensure valid unit quaternion if odom orientation is degenerate
+		const auto& q = ps.pose.orientation;
+		if (std::abs(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z - 1.0) > 0.01) {
+			ps.pose.orientation = geometry_msgs::msg::Quaternion{};
+			ps.pose.orientation.w = 1.0;
+		}
+		return ps;
+	}
+
 	// ─────────────────────────────────────────────────────────────────────────
 	// Odometry conversion: ROS ENU/FLU → PX4 NED/FRD
 	// ─────────────────────────────────────────────────────────────────────────
@@ -606,10 +625,16 @@ private:
 
 			// Attempt ARM (also handles odom-recovery re-arm after INACTIVE)
 			if (odom_healthy_) {
+				// Initialise hover setpoint to current odom position so the
+				// heartbeat timer never publishes an uninitialised (0,0,0) target.
+				last_position_setpoint_ = odom_to_posestamped();
 				send_offboard_mode_command();
 				send_arm_command(true);
 				offboard_state_ = OffboardState::TRACKING;
-				RCLCPP_INFO(this->get_logger(), "[AUTO] ARM sent → TRACKING");
+				RCLCPP_INFO(this->get_logger(), "[AUTO] ARM sent → TRACKING (hover init: %.2f, %.2f, %.2f ENU)",
+					last_position_setpoint_.pose.position.x,
+					last_position_setpoint_.pose.position.y,
+					last_position_setpoint_.pose.position.z);
 			} else {
 				RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
 					"[AUTO] Waiting for odometry before arming... topic: %s",
@@ -628,12 +653,20 @@ private:
 			? (this->now() - last_waypoint_time_).seconds()
 			: std::numeric_limits<double>::max();
 
-		if (wp_age < odom_timeout_s_) {
+		if (wp_age < waypoint_timeout_s_) {
+			// Fresh waypoint from upstream planner — track it
 			last_position_setpoint_ = latest_waypoint_;
-		} else if (has_waypoint_) {
-			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-				"[AUTO] Waypoint timeout (%.2fs) — holding last position", wp_age);
-			// last_position_setpoint_ keeps its previous value → hover in place
+		} else {
+			// Waypoint stale (> waypoint_timeout_s_) or never received.
+			// Hover at current odom position (updated every tick so PX4 holds position).
+			// If odom also becomes unhealthy, loop() transitions to DESCENDING.
+			if (odom_healthy_) {
+				last_position_setpoint_ = odom_to_posestamped();
+				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+					"[AUTO] Waypoint timeout (%.2fs > %.2fs) — hovering at odom position",
+					wp_age, waypoint_timeout_s_);
+			}
+			// !odom_healthy_ → loop() odom tick already triggers TRACKING → DESCENDING
 		}
 	}
 
