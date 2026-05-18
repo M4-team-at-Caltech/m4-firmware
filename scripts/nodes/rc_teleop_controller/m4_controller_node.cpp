@@ -825,6 +825,7 @@ private:
 				case AutoSubState::IDLE:
 				default: break;
 			}
+			publish_mode_status();
 			return;  // Do not fall through to MANUAL logic
 		}
 
