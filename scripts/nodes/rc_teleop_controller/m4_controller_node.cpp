@@ -730,7 +730,7 @@ private:
 			return;
 
 		rc_state = rc_controller.get_rc_state();
-
+		publish_mode_status();
 		// ────────────────────────────────────────────────────────────────────
 		// [①] DISARM — highest priority, overrides everything including AUTO
 		// ────────────────────────────────────────────────────────────────────
