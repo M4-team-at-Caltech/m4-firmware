@@ -22,7 +22,6 @@
 #include <nav_msgs/msg/odometry.hpp>
 
 #include <custom_msgs/msg/m4_mode_cmd.hpp>
-#include <custom_msgs/msg/m4_mode_status.hpp>
 
 #include "src/RCcontroller.h"
 #include "M4Base.h"
@@ -136,9 +135,6 @@ public:
 		vehicle_odom_pub_ =
 			this->create_publisher<px4_msgs::msg::VehicleOdometry>(odom_fmu_topic, 10);
 
-		mode_status_pub_ =
-			this->create_publisher<custom_msgs::msg::M4ModeStatus>("/auto/mode_status", 10);
-
 		RCLCPP_INFO(this->get_logger(),
 			"[m4_controller_node] AUTO mode ready. odom_source=%s topic=%s fmu_out=%s descent=%.2fm/s",
 			odom_source_.c_str(), odom_topic_.c_str(), odom_fmu_topic.c_str(), descent_rate_mps_);
@@ -176,11 +172,10 @@ private:
 	px4_msgs::msg::VehicleStatus pixhawk_state;
 	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr state_subscriber_;
 
-	rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr        vehicle_command_publisher_;
-	rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr  offboard_control_mode_pub_;
-	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr   trajectory_setpoint_pub_;
-	rclcpp::Publisher<px4_msgs::msg::VehicleOdometry>::SharedPtr      vehicle_odom_pub_;
-	rclcpp::Publisher<custom_msgs::msg::M4ModeStatus>::SharedPtr      mode_status_pub_;
+	rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr      vehicle_command_publisher_;
+	rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboard_control_mode_pub_;
+	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr  trajectory_setpoint_pub_;
+	rclcpp::Publisher<px4_msgs::msg::VehicleOdometry>::SharedPtr     vehicle_odom_pub_;
 
 	// ── AUTO mode: subscribers ──
 	rclcpp::Subscription<custom_msgs::msg::M4ModeCmd>::SharedPtr      auto_mode_cmd_sub_;
@@ -437,45 +432,6 @@ private:
 		}
 	}
 
-	// Map M4Configurations → int32 (matches M4ModeCmd.mode values)
-	static int32_t config_to_int(M4Configurations cfg)
-	{
-		switch (cfg) {
-			case M4Configurations::STAND:   return 0;
-			case M4Configurations::UAV:     return 1;
-			case M4Configurations::CROUCH1: return 2;
-			case M4Configurations::CROUCH2: return 4;
-			case M4Configurations::SIT:     return -2;
-			default:                        return -1;  // INIT / UNKNOWN
-		}
-	}
-
-	// Map OffboardState → int32
-	static int32_t offboard_state_to_int(OffboardState s)
-	{
-		switch (s) {
-			case OffboardState::INACTIVE:   return 0;
-			case OffboardState::PRE_ARM:    return 1;
-			case OffboardState::TRACKING:   return 2;
-			case OffboardState::DESCENDING: return 3;
-			default:                        return 0;
-		}
-	}
-
-	// Publish current controller state to /auto/mode_status (50 Hz, called from loop())
-	void publish_mode_status()
-	{
-		custom_msgs::msg::M4ModeStatus msg;
-		msg.header.stamp    = this->get_clock()->now();
-		msg.header.frame_id = "";
-		msg.configuration   = config_to_int(m4_configuration);
-		msg.offboard_state  = offboard_state_to_int(offboard_state_);
-		msg.auto_mode_active = auto_mode_active_;
-		msg.odom_healthy     = odom_healthy_;
-		msg.arm_pending      = arm_pending_;
-		mode_status_pub_->publish(msg);
-	}
-
 	// Build a PoseStamped hover setpoint from the latest odom (ENU frame).
 	// Used to initialise last_position_setpoint_ at ARM time and during waypoint timeout.
 	geometry_msgs::msg::PoseStamped odom_to_posestamped() const
@@ -730,7 +686,6 @@ private:
 			return;
 
 		rc_state = rc_controller.get_rc_state();
-		publish_mode_status();
 		// ────────────────────────────────────────────────────────────────────
 		// [①] DISARM — highest priority, overrides everything including AUTO
 		// ────────────────────────────────────────────────────────────────────
@@ -749,7 +704,6 @@ private:
 			// Reset prev_auto_switch_ so that re-arming with AUTO switch
 			// still in AUTO position correctly re-triggers AUTO mode activation.
 			prev_auto_switch_ = AutoSwitchState::MANUAL;
-			publish_mode_status();
 			return;
 		}
 
@@ -883,9 +837,6 @@ private:
 				RCLCPP_INFO(this->get_logger(), "Disarm command sent to Pixhawk");
 			}
 		}
-
-		// Publish status at end of every loop() tick (50 Hz)
-		publish_mode_status();
 	}
 };
 
