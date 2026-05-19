@@ -259,7 +259,7 @@ private:
 		}
 	}
 
-	// ─────────────────────────────────────────────────────────────────────────
+	// ─────────────────────────────────────────────────────mode_cmd_callback────────────────────
 	// Callbacks
 	// ─────────────────────────────────────────────────────────────────────────
 	void state_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg)
@@ -634,7 +634,8 @@ private:
 
 		#ifndef DRY_RUN
 			if (cmd_vel_ok) {
-				m4->drive(latest_cmd_vel_.linear.x, latest_cmd_vel_.angular.z);
+				// angular.z sign is inverted relative to M4Base differential drive convention
+				m4->drive(latest_cmd_vel_.linear.x, -latest_cmd_vel_.angular.z);
 			} else {
 				m4->drive(0.0f, 0.0f);
 				if (has_cmd_vel_)
