@@ -68,8 +68,8 @@ joints:
         speed: 27.27       # degrees per second
     BL_Saggital:
         id: 6              # Dynamixel motor ID
-        zero_tick: 0    # Encoder tick corresponding to zero degrees position
-        min_tick: 0     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        zero_tick: 1    # Encoder tick corresponding to zero degrees position
+        min_tick: 1     # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 1000     # max_tick = max_position_degrees / 0.087891 + zero_tick
         speed: 60          # degrees per second
 
@@ -78,7 +78,7 @@ joints:
         id: 7              # Dynamixel motor ID
         zero_tick: 1000    # Encoder tick corresponding to zero degrees position
         min_tick: 1000     # min_tick = min_position_degrees / 0.087891 + zero_tick
-        max_tick: 1016     # max_tick = max_position_degrees / 0.087891
+        max_tick: 2030     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     BR_Saggital:
         id: 8              # Dynamixel motor ID
