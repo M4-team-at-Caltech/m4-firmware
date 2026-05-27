@@ -31,8 +31,8 @@ joints:
     # FL Leg
     FL_Frontal:
         id: 1              # Dynamixel motor ID
-        zero_tick: 1000     # Encoder tick corresponding to zero degrees position
-        min_tick: 1000      # min_tick = min_position_degrees / 0.087891 + zero_tick
+        zero_tick: 960     # Encoder tick corresponding to zero degrees position
+        min_tick: 960      # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2055     # max_tick = max_position_degrees / 0.087891
         speed: 27.27       # degrees per second
     FL_Saggital:           
@@ -47,8 +47,8 @@ joints:
     FR_Frontal:
         # Reverse drive mode - CW = +ve, CCW = -ve
         id: 3              # Dynamixel motor ID
-        zero_tick: 1030     # Encoder tick corresponding to zero degrees position
-        min_tick: 1030      # min_tick = min_position_degrees / 0.087891 + zero_tick
+        zero_tick: 980     # Encoder tick corresponding to zero degrees position
+        min_tick: 980      # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2055     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     FR_Saggital:
@@ -62,8 +62,8 @@ joints:
     BL_Frontal:
          # Reverse drive mode - CW = +ve, CCW = -ve
         id: 5              # Dynamixel motor ID
-        zero_tick: 1046    # Encoder tick corresponding to zero degrees position
-        min_tick: 1046     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        zero_tick: 980    # Encoder tick corresponding to zero degrees position
+        min_tick: 980     # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2060     # max_tick = max_position_degrees / 0.087891
         speed: 27.27       # degrees per second
     BL_Saggital:
@@ -76,8 +76,8 @@ joints:
     # BR Leg
     BR_Frontal:
         id: 7              # Dynamixel motor ID
-        zero_tick: 1000    # Encoder tick corresponding to zero degrees position
-        min_tick: 1000     # min_tick = min_position_degrees / 0.087891 + zero_tick
+        zero_tick: 960    # Encoder tick corresponding to zero degrees position
+        min_tick: 960     # min_tick = min_position_degrees / 0.087891 + zero_tick
         max_tick: 2030     # max_tick = max_position_degrees / 0.087891
         speed: 27.27          # degrees per second
     BR_Saggital:
