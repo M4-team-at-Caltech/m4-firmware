@@ -274,7 +274,7 @@ private:
 		odom_healthy_   = true;
 
 		// Forward to PX4 (ENU → NED conversion)
-		vehicle_odom_pub_->publish(convert_odom_enu_to_ned(*msg));
+		vehicle_odom_pub_->publish(convert_odom_flu_to_ned(*msg));
 	}
 
 	void mode_cmd_callback(const custom_msgs::msg::M4ModeCmd::SharedPtr msg)
@@ -496,33 +496,35 @@ private:
 	// ─────────────────────────────────────────────────────────────────────────
 	// Odometry conversion: ROS ENU/FLU → PX4 NED/FRD
 	// ─────────────────────────────────────────────────────────────────────────
-	px4_msgs::msg::VehicleOdometry convert_odom_enu_to_ned(
+	px4_msgs::msg::VehicleOdometry convert_odom_flu_to_ned(
 		const nav_msgs::msg::Odometry& ros_odom)
 	{
 		px4_msgs::msg::VehicleOdometry px4_odom{};
 		px4_odom.timestamp        = this->get_clock()->now().nanoseconds() / 1000;
 		px4_odom.timestamp_sample = px4_odom.timestamp;
 
-		// Position: ENU → NED  (x=East→y, y=North→x, z=Up→-z)
-		px4_odom.position[0] =  (float)ros_odom.pose.pose.position.y;
-		px4_odom.position[1] =  (float)ros_odom.pose.pose.position.x;
+		// Position: FLU world → NED world
+		//   Forward(x) → North(x),  Left(y) → East(-y),  Up(z) → Down(-z)
+		px4_odom.position[0] =  (float)ros_odom.pose.pose.position.x;
+		px4_odom.position[1] = -(float)ros_odom.pose.pose.position.y;
 		px4_odom.position[2] = -(float)ros_odom.pose.pose.position.z;
 		px4_odom.pose_frame  = px4_msgs::msg::VehicleOdometry::POSE_FRAME_NED;
 
-		// Quaternion: ENU/FLU → NED/FRD  (w, x→y, y→x, z→-z)
+		// Quaternion: FLU body → FRD body (180° rotation around X axis)
+		//   q_NED = (w, +x, -y, -z)
 		const auto& q = ros_odom.pose.pose.orientation;
 		px4_odom.q[0] =  (float)q.w;
-		px4_odom.q[1] =  (float)q.y;
-		px4_odom.q[2] =  (float)q.x;
+		px4_odom.q[1] =  (float)q.x;
+		px4_odom.q[2] = -(float)q.y;
 		px4_odom.q[3] = -(float)q.z;
 
-		// Velocity: ENU → NED
-		px4_odom.velocity[0]    =  (float)ros_odom.twist.twist.linear.y;
-		px4_odom.velocity[1]    =  (float)ros_odom.twist.twist.linear.x;
+		// Velocity: FLU world → NED world (same sign pattern as position)
+		px4_odom.velocity[0]    =  (float)ros_odom.twist.twist.linear.x;
+		px4_odom.velocity[1]    = -(float)ros_odom.twist.twist.linear.y;
 		px4_odom.velocity[2]    = -(float)ros_odom.twist.twist.linear.z;
 		px4_odom.velocity_frame = px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED;
 
-		// Angular velocity: FLU → FRD (x→x, y→-y, z→-z)
+		// Angular velocity: FLU body → FRD body (same 180° around X)
 		px4_odom.angular_velocity[0] =  (float)ros_odom.twist.twist.angular.x;
 		px4_odom.angular_velocity[1] = -(float)ros_odom.twist.twist.angular.y;
 		px4_odom.angular_velocity[2] = -(float)ros_odom.twist.twist.angular.z;
