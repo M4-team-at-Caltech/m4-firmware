@@ -290,7 +290,7 @@ private:
 			vehicle_odom_pub_->publish(convert_odom_flu_to_ned(*msg));
 		} catch (const tf2::TransformException& e) {
 			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-				"[odom] TF world→ned_world not ready: %s", e.what());
+				"[odom] TF ned_base_link→ned_world not ready: %s", e.what());
 		}
 	}
 
@@ -511,10 +511,11 @@ private:
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// Odometry conversion: ROS ENU/FLU → PX4 NED/FRD
+	// Odometry conversion: FLU (base_link in world) → NED (ned_base_link in ned_world)
 	// ─────────────────────────────────────────────────────────────────────────
-	// Converts odometry from FLU world frame to NED via TF2 (world → ned_world).
-	// Throws tf2::TransformException if the static transform is not yet available.
+	// TF chain: ned_world ← world ← camera_init ← body ← base_link ← ned_base_link
+	// Requires static TFs: world→ned_world and base_link→ned_base_link (both 180° around X).
+	// Throws tf2::TransformException if any transform in the chain is not yet available.
 	px4_msgs::msg::VehicleOdometry convert_odom_flu_to_ned(
 		const nav_msgs::msg::Odometry& ros_odom)
 	{
@@ -522,26 +523,26 @@ private:
 		px4_odom.timestamp        = this->get_clock()->now().nanoseconds() / 1000;
 		px4_odom.timestamp_sample = px4_odom.timestamp;
 
-		// ── Pose (position + orientation) ──────────────────────────────────────
-		geometry_msgs::msg::PoseStamped pose_in, pose_out;
-		pose_in.header = ros_odom.header;   // frame_id = "world"
-		pose_in.pose   = ros_odom.pose.pose;
-		tf_buffer_->transform(pose_in, pose_out, "ned_world");
+		// ── Pose: ned_base_link (FRD body) in ned_world (NED world) ───────────
+		// lookupTransform resolves the full TF chain automatically.
+		geometry_msgs::msg::TransformStamped tf_pose =
+			tf_buffer_->lookupTransform("ned_world", "ned_base_link", tf2::TimePointZero);
 
-		px4_odom.position[0] = (float)pose_out.pose.position.x;
-		px4_odom.position[1] = (float)pose_out.pose.position.y;
-		px4_odom.position[2] = (float)pose_out.pose.position.z;
+		px4_odom.position[0] = (float)tf_pose.transform.translation.x;
+		px4_odom.position[1] = (float)tf_pose.transform.translation.y;
+		px4_odom.position[2] = (float)tf_pose.transform.translation.z;
 		px4_odom.pose_frame  = px4_msgs::msg::VehicleOdometry::POSE_FRAME_NED;
 
-		const auto& q = pose_out.pose.orientation;
+		const auto& q = tf_pose.transform.rotation;
 		px4_odom.q[0] = (float)q.w;
 		px4_odom.q[1] = (float)q.x;
 		px4_odom.q[2] = (float)q.y;
 		px4_odom.q[3] = (float)q.z;
 
-		// ── Linear velocity (world frame) ──────────────────────────────────────
+		// ── Linear velocity: world FLU → ned_world NED ────────────────────────
+		// base_world_odom.py outputs linear velocity rotated to world frame (FLU).
 		geometry_msgs::msg::Vector3Stamped vel_in, vel_out;
-		vel_in.header = ros_odom.header;
+		vel_in.header = ros_odom.header;   // frame_id = "world" ✓
 		vel_in.vector = ros_odom.twist.twist.linear;
 		tf_buffer_->transform(vel_in, vel_out, "ned_world");
 
@@ -550,11 +551,13 @@ private:
 		px4_odom.velocity[2]    = (float)vel_out.vector.z;
 		px4_odom.velocity_frame = px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED;
 
-		// ── Angular velocity (body frame) ──────────────────────────────────────
+		// ── Angular velocity: base_link FLU → ned_base_link FRD ──────────────
+		// Angular velocity from FastLIO is in body frame; child_frame_id = "base_link".
 		geometry_msgs::msg::Vector3Stamped ang_in, ang_out;
-		ang_in.header = ros_odom.header;
-		ang_in.vector = ros_odom.twist.twist.angular;
-		tf_buffer_->transform(ang_in, ang_out, "ned_world");
+		ang_in.header.frame_id = ros_odom.child_frame_id;  // "base_link"
+		ang_in.header.stamp    = ros_odom.header.stamp;
+		ang_in.vector          = ros_odom.twist.twist.angular;
+		tf_buffer_->transform(ang_in, ang_out, "ned_base_link");
 
 		px4_odom.angular_velocity[0] = (float)ang_out.vector.x;
 		px4_odom.angular_velocity[1] = (float)ang_out.vector.y;
