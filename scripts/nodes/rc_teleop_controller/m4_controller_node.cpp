@@ -394,14 +394,14 @@ private:
 		offboard_control_mode_pub_->publish(msg);
 	}
 
-	// Publish position setpoint (ENU PoseStamped → NED TrajectorySetpoint)
+	// Publish position setpoint (world/FLU PoseStamped → NED TrajectorySetpoint)
 	void publish_trajectory_setpoint(const geometry_msgs::msg::PoseStamped& wp)
 	{
 		px4_msgs::msg::TrajectorySetpoint msg{};
 		msg.timestamp   = this->get_clock()->now().nanoseconds() / 1000;
-		msg.position[0] =  (float)wp.pose.position.y;  // North
-		msg.position[1] =  (float)wp.pose.position.x;  // East
-		msg.position[2] = -(float)wp.pose.position.z;  // Down
+		msg.position[0] =  (float)wp.pose.position.x;  // North = FLU Forward
+		msg.position[1] = -(float)wp.pose.position.y;  // East  = -FLU Left
+		msg.position[2] = -(float)wp.pose.position.z;  // Down  = -FLU Up
 		msg.velocity[0] = msg.velocity[1] = msg.velocity[2]         = NaNf;
 		msg.acceleration[0] = msg.acceleration[1] = msg.acceleration[2] = NaNf;
 		msg.yaw         = NaNf;
