@@ -31,9 +31,11 @@ find_package(nav_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(custom_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 #find_package(mavros_msgs REQUIRED)
 
-set(ROS_DEPENDENCIES rclcpp std_msgs geometry_msgs nav_msgs trajectory_msgs px4_msgs custom_msgs)
+set(ROS_DEPENDENCIES rclcpp std_msgs geometry_msgs nav_msgs trajectory_msgs px4_msgs custom_msgs tf2_ros tf2_geometry_msgs)
 
 # Find other packages
 find_package(Threads REQUIRED)

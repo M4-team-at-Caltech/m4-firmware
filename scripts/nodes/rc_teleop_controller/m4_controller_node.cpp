@@ -24,6 +24,10 @@
 #include <custom_msgs/msg/m4_mode_cmd.hpp>
 #include <custom_msgs/msg/m4_mode_status.hpp>
 
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+
 #include "src/RCcontroller.h"
 #include "M4Base.h"
 
@@ -139,6 +143,10 @@ public:
 		mode_status_pub_ =
 			this->create_publisher<custom_msgs::msg::M4ModeStatus>("/auto/mode_status", 10);
 
+		// TF2 buffer + listener for FLU→NED odometry conversion
+		tf_buffer_   = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+		tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
 		RCLCPP_INFO(this->get_logger(),
 			"[m4_controller_node] AUTO mode ready. odom_source=%s topic=%s fmu_out=%s descent=%.2fm/s",
 			odom_source_.c_str(), odom_topic_.c_str(), odom_fmu_topic.c_str(), descent_rate_mps_);
@@ -181,6 +189,10 @@ private:
 	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr   trajectory_setpoint_pub_;
 	rclcpp::Publisher<px4_msgs::msg::VehicleOdometry>::SharedPtr      vehicle_odom_pub_;
 	rclcpp::Publisher<custom_msgs::msg::M4ModeStatus>::SharedPtr      mode_status_pub_;
+
+	// TF2 for FLU → NED coordinate conversion
+	std::shared_ptr<tf2_ros::Buffer>            tf_buffer_;
+	std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
 	// ── AUTO mode: subscribers ──
 	rclcpp::Subscription<custom_msgs::msg::M4ModeCmd>::SharedPtr      auto_mode_cmd_sub_;
@@ -273,8 +285,13 @@ private:
 		last_odom_time_ = this->now();
 		odom_healthy_   = true;
 
-		// Forward to PX4 (ENU → NED conversion)
-		vehicle_odom_pub_->publish(convert_odom_flu_to_ned(*msg));
+		// Forward to PX4 via TF2-based FLU→NED conversion
+		try {
+			vehicle_odom_pub_->publish(convert_odom_flu_to_ned(*msg));
+		} catch (const tf2::TransformException& e) {
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+				"[odom] TF world→ned_world not ready: %s", e.what());
+		}
 	}
 
 	void mode_cmd_callback(const custom_msgs::msg::M4ModeCmd::SharedPtr msg)
@@ -496,6 +513,8 @@ private:
 	// ─────────────────────────────────────────────────────────────────────────
 	// Odometry conversion: ROS ENU/FLU → PX4 NED/FRD
 	// ─────────────────────────────────────────────────────────────────────────
+	// Converts odometry from FLU world frame to NED via TF2 (world → ned_world).
+	// Throws tf2::TransformException if the static transform is not yet available.
 	px4_msgs::msg::VehicleOdometry convert_odom_flu_to_ned(
 		const nav_msgs::msg::Odometry& ros_odom)
 	{
@@ -503,31 +522,43 @@ private:
 		px4_odom.timestamp        = this->get_clock()->now().nanoseconds() / 1000;
 		px4_odom.timestamp_sample = px4_odom.timestamp;
 
-		// Position: FLU world → NED world
-		//   Forward(x) → North(x),  Left(y) → East(-y),  Up(z) → Down(-z)
-		px4_odom.position[0] =  (float)ros_odom.pose.pose.position.x;
-		px4_odom.position[1] = -(float)ros_odom.pose.pose.position.y;
-		px4_odom.position[2] = -(float)ros_odom.pose.pose.position.z;
+		// ── Pose (position + orientation) ──────────────────────────────────────
+		geometry_msgs::msg::PoseStamped pose_in, pose_out;
+		pose_in.header = ros_odom.header;   // frame_id = "world"
+		pose_in.pose   = ros_odom.pose.pose;
+		tf_buffer_->transform(pose_in, pose_out, "ned_world");
+
+		px4_odom.position[0] = (float)pose_out.pose.position.x;
+		px4_odom.position[1] = (float)pose_out.pose.position.y;
+		px4_odom.position[2] = (float)pose_out.pose.position.z;
 		px4_odom.pose_frame  = px4_msgs::msg::VehicleOdometry::POSE_FRAME_NED;
 
-		// Quaternion: FLU body → FRD body (180° rotation around X axis)
-		//   q_NED = (w, +x, -y, -z)
-		const auto& q = ros_odom.pose.pose.orientation;
-		px4_odom.q[0] =  (float)q.w;
-		px4_odom.q[1] =  (float)q.x;
-		px4_odom.q[2] = -(float)q.y;
-		px4_odom.q[3] = -(float)q.z;
+		const auto& q = pose_out.pose.orientation;
+		px4_odom.q[0] = (float)q.w;
+		px4_odom.q[1] = (float)q.x;
+		px4_odom.q[2] = (float)q.y;
+		px4_odom.q[3] = (float)q.z;
 
-		// Velocity: FLU world → NED world (same sign pattern as position)
-		px4_odom.velocity[0]    =  (float)ros_odom.twist.twist.linear.x;
-		px4_odom.velocity[1]    = -(float)ros_odom.twist.twist.linear.y;
-		px4_odom.velocity[2]    = -(float)ros_odom.twist.twist.linear.z;
+		// ── Linear velocity (world frame) ──────────────────────────────────────
+		geometry_msgs::msg::Vector3Stamped vel_in, vel_out;
+		vel_in.header = ros_odom.header;
+		vel_in.vector = ros_odom.twist.twist.linear;
+		tf_buffer_->transform(vel_in, vel_out, "ned_world");
+
+		px4_odom.velocity[0]    = (float)vel_out.vector.x;
+		px4_odom.velocity[1]    = (float)vel_out.vector.y;
+		px4_odom.velocity[2]    = (float)vel_out.vector.z;
 		px4_odom.velocity_frame = px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED;
 
-		// Angular velocity: FLU body → FRD body (same 180° around X)
-		px4_odom.angular_velocity[0] =  (float)ros_odom.twist.twist.angular.x;
-		px4_odom.angular_velocity[1] = -(float)ros_odom.twist.twist.angular.y;
-		px4_odom.angular_velocity[2] = -(float)ros_odom.twist.twist.angular.z;
+		// ── Angular velocity (body frame) ──────────────────────────────────────
+		geometry_msgs::msg::Vector3Stamped ang_in, ang_out;
+		ang_in.header = ros_odom.header;
+		ang_in.vector = ros_odom.twist.twist.angular;
+		tf_buffer_->transform(ang_in, ang_out, "ned_world");
+
+		px4_odom.angular_velocity[0] = (float)ang_out.vector.x;
+		px4_odom.angular_velocity[1] = (float)ang_out.vector.y;
+		px4_odom.angular_velocity[2] = (float)ang_out.vector.z;
 
 		// Variances: NaN = unknown
 		for (int i = 0; i < 3; i++) {
