@@ -12,6 +12,7 @@
 #include <px4_msgs/msg/vehicle_status.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <px4_msgs/msg/vehicle_odometry.hpp>
+#include <px4_msgs/msg/vehicle_land_detected.hpp>
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 
@@ -104,6 +105,10 @@ public:
 			"/fmu/out/vehicle_status", px4_qos,
 			std::bind(&M4ControllerNode::state_callback, this, _1));
 
+		vehicle_land_detected_sub_ = this->create_subscription<px4_msgs::msg::VehicleLandDetected>(
+			"/fmu/out/vehicle_land_detected", px4_qos,
+			std::bind(&M4ControllerNode::vehicle_land_detected_callback, this, _1));
+
 		// AUTO mode inputs
 		auto_mode_cmd_sub_ = this->create_subscription<custom_msgs::msg::M4ModeCmd>(
 			"/auto/mode_cmd", 10,
@@ -190,7 +195,6 @@ private:
 	rclcpp::Publisher<px4_msgs::msg::VehicleOdometry>::SharedPtr      vehicle_odom_pub_;
 	rclcpp::Publisher<custom_msgs::msg::M4ModeStatus>::SharedPtr      mode_status_pub_;
 
-	// TF2 for FLU → NED coordinate conversion
 	std::shared_ptr<tf2_ros::Buffer>            tf_buffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
@@ -204,9 +208,12 @@ private:
 	std::string odom_source_{"fastlio"};
 	std::string odom_topic_{"/localization/odom"};
 	double      odom_timeout_s_{0.5};
-	double      descent_rate_mps_{0.3};  // downward speed (m/s) when odom is lost
-	double      uav_arm_wait_s_{5.0};    // wait after G2A transform before ARM (IMU settle)
+	double      descent_rate_mps_{0.3};   // downward speed (m/s) when odom is lost (DESCENDING)
+	double      arm_imu_wait_s_{3.0};     // wait after G2A transform before ARM (IMU settle)
 	double      waypoint_timeout_s_{2.0}; // aerial waypoint staleness threshold; hover at odom if exceeded
+	double      landing_descent_mps_{0.3};  // controlled descent rate during LANDING (m/s)
+	double      landing_z_stop_thr_{0.05};  // odom Z velocity threshold to detect touchdown (m/s)
+	double      landing_z_stop_dur_{1.0};   // seconds Z must stay below threshold to confirm touchdown
 
 	// ── AUTO mode: high-level state ──
 	bool            auto_mode_active_{false};
@@ -215,20 +222,36 @@ private:
 	enum class AutoSubState { IDLE, GROUND, AERIAL };
 	AutoSubState auto_sub_state_{AutoSubState::IDLE};
 
-	// ── UAV ARM pending (non-blocking wait after G2A transform) ──
+	// ── UAV ARM: IMU settle wait + confirmation retry ──
 	bool         arm_pending_{false};
 	rclcpp::Time arm_pending_since_{0, 0, RCL_ROS_TIME};
+	bool         arm_retry_active_{false};
+	rclcpp::Time arm_retry_since_{0, 0, RCL_ROS_TIME};
+	double       arm_retry_window_s_{3.0};
+
+	// ── LANDING state ──
+	custom_msgs::msg::M4ModeCmd  pending_landing_mode_cmd_{};
+	float        landing_setpoint_x_{0.0f};
+	float        landing_setpoint_y_{0.0f};
+	float        landing_setpoint_z_{0.0f};
+	bool         landing_z_stopped_{false};
+	rclcpp::Time landing_z_stop_start_{0, 0, RCL_ROS_TIME};
+
+	bool         has_land_detected_{false};
+	px4_msgs::msg::VehicleLandDetected last_land_detected_{};
+	rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr vehicle_land_detected_sub_;
 
 	// ── Offboard state machine ──
 	// Decoupled from loop() — drives the dedicated 10Hz heartbeat timer.
 	//   INACTIVE   : heartbeat not sent, PX4 not in offboard
-	//   PRE_ARM    : arm_pending_ wait period — heartbeat sent (position=true), no setpoint
-	//                Warms up PX4 offboard stream so ARM succeeds without health warnings
+	//   PRE_ARM    : IMU settle wait + ARM retry window — heartbeat sent (position=true)
 	//   TRACKING   : position control, publishes OffboardControlMode(position=true) + last setpoint
 	//   DESCENDING : velocity control, publishes OffboardControlMode(velocity=true) + descent cmd
 	//                entered when odom is lost mid-flight; NOT auto-cleared on odom recovery
 	//                (requires explicit mode_cmd=1 to resume TRACKING)
-	enum class OffboardState { INACTIVE, PRE_ARM, TRACKING, DESCENDING };
+	//   LANDING    : position control with decreasing Z; entered on A2G cmd while TRACKING
+	//                confirms touchdown via vehicle_land_detected or odom Z stop
+	enum class OffboardState { INACTIVE, PRE_ARM, TRACKING, DESCENDING, LANDING };
 	OffboardState offboard_state_{OffboardState::INACTIVE};
 
 	// ── Odom health ──
@@ -261,9 +284,13 @@ private:
 				odom_source_       = cfg["auto_mode"]["odom_source"].as<std::string>(odom_source_);
 				odom_topic_        = cfg["auto_mode"]["odom_topic"].as<std::string>(odom_topic_);
 				odom_timeout_s_    = cfg["auto_mode"]["odom_timeout_s"].as<double>(odom_timeout_s_);
-				descent_rate_mps_  = cfg["auto_mode"]["odom_lost_descent_mps"].as<double>(descent_rate_mps_);
-				uav_arm_wait_s_      = cfg["auto_mode"]["uav_arm_wait_s"].as<double>(uav_arm_wait_s_);
-			waypoint_timeout_s_  = cfg["auto_mode"]["waypoint_timeout_s"].as<double>(waypoint_timeout_s_);
+				descent_rate_mps_    = cfg["auto_mode"]["odom_lost_descent_mps"].as<double>(descent_rate_mps_);
+				arm_imu_wait_s_      = cfg["auto_mode"]["arm_imu_wait_s"].as<double>(arm_imu_wait_s_);
+				arm_retry_window_s_  = cfg["auto_mode"]["arm_retry_window_s"].as<double>(arm_retry_window_s_);
+				waypoint_timeout_s_  = cfg["auto_mode"]["waypoint_timeout_s"].as<double>(waypoint_timeout_s_);
+				landing_descent_mps_ = cfg["auto_mode"]["landing_descent_mps"].as<double>(landing_descent_mps_);
+				landing_z_stop_thr_  = cfg["auto_mode"]["landing_z_stop_thr"].as<double>(landing_z_stop_thr_);
+				landing_z_stop_dur_  = cfg["auto_mode"]["landing_z_stop_dur"].as<double>(landing_z_stop_dur_);
 			}
 		} catch (const std::exception& e) {
 			RCLCPP_WARN(this->get_logger(),
@@ -292,6 +319,12 @@ private:
 			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
 				"[odom] TF ned_base_link→ned_world not ready: %s", e.what());
 		}
+	}
+
+	void vehicle_land_detected_callback(const px4_msgs::msg::VehicleLandDetected::SharedPtr msg)
+	{
+		last_land_detected_ = *msg;
+		has_land_detected_  = true;
 	}
 
 	void mode_cmd_callback(const custom_msgs::msg::M4ModeCmd::SharedPtr msg)
@@ -381,6 +414,20 @@ private:
 		RCLCPP_INFO(this->get_logger(), "[AUTO] PX4 flight mode → STABILIZED");
 	}
 
+	// DISARM + stabilized mode + re-queue pending ground mode_cmd to trigger A2G transform.
+	// Called when LANDING touchdown is confirmed (vehicle_land_detected or odom Z stop).
+	void confirm_landing()
+	{
+		send_arm_command(false);
+		send_stabilized_mode_command();
+		offboard_state_    = OffboardState::INACTIVE;
+		landing_z_stopped_ = false;
+		// Re-trigger the stored ground mode cmd; next loop() tick will call process_mode_cmd
+		// which handles A2G transform and drives to the correct ground configuration.
+		has_new_mode_cmd_ = true;
+		latest_mode_cmd_  = pending_landing_mode_cmd_;
+	}
+
 	// Publish OffboardControlMode — position_mode=true → position ctrl,  false → velocity ctrl
 	void publish_offboard_control_mode(bool position_mode)
 	{
@@ -451,6 +498,18 @@ private:
 				RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
 					"[AUTO] DESCENDING — odom lost. Restore odom and resend mode_cmd=1 to resume.");
 				return;
+
+			case OffboardState::LANDING: {
+				// Decrease Z setpoint each tick (10 Hz → 0.1 s per tick)
+				landing_setpoint_z_ -= (float)(landing_descent_mps_ * 0.1);
+				geometry_msgs::msg::PoseStamped landing_ps;
+				landing_ps.pose.position.x = landing_setpoint_x_;
+				landing_ps.pose.position.y = landing_setpoint_y_;
+				landing_ps.pose.position.z = landing_setpoint_z_;
+				publish_offboard_control_mode(true);  // position mode
+				publish_trajectory_setpoint(landing_ps);
+				return;
+			}
 		}
 	}
 
@@ -475,6 +534,7 @@ private:
 			case OffboardState::PRE_ARM:    return 1;
 			case OffboardState::TRACKING:   return 2;
 			case OffboardState::DESCENDING: return 3;
+			case OffboardState::LANDING:    return 4;
 			default:                        return 0;
 		}
 	}
@@ -605,12 +665,25 @@ private:
 			RCLCPP_INFO(this->get_logger(),
 				"[AUTO] mode=UAV — G2A transform triggered. "
 				"Offboard heartbeat started. Waiting %.1fs for IMU to settle before ARM.",
-				uav_arm_wait_s_);
+				arm_imu_wait_s_);
 			return;
 		}
 
 		// ── Ground modes (STAND / CROUCH1 / CROUCH2) ─────────────────────
-		// Deactivate offboard if we were in aerial
+		// If actively tracking, initiate controlled landing instead of immediate DISARM
+		if (offboard_state_ == OffboardState::TRACKING) {
+			pending_landing_mode_cmd_ = cmd;
+			landing_setpoint_x_ = (float)last_position_setpoint_.pose.position.x;
+			landing_setpoint_y_ = (float)last_position_setpoint_.pose.position.y;
+			landing_setpoint_z_ = (float)last_position_setpoint_.pose.position.z;
+			landing_z_stopped_  = false;
+			offboard_state_     = OffboardState::LANDING;
+			RCLCPP_INFO(this->get_logger(),
+				"[AUTO] Controlled landing initiated (target mode=%d after touchdown)", mode);
+			return;
+		}
+
+		// Deactivate offboard if we were in other aerial states (PRE_ARM / DESCENDING)
 		if (offboard_state_ != OffboardState::INACTIVE) {
 			send_arm_command(false);
 			send_stabilized_mode_command();  // exit OFFBOARD so manual RC arming works
@@ -688,34 +761,69 @@ private:
 	// ─────────────────────────────────────────────────────────────────────────
 	void execute_auto_aerial()
 	{
-		// PRE_ARM / INACTIVE: waiting for IMU settle timer or odom recovery before ARM
-		if (offboard_state_ == OffboardState::PRE_ARM ||
-		    offboard_state_ == OffboardState::INACTIVE) {
-			if (arm_pending_) {
-				const double elapsed = (this->now() - arm_pending_since_).seconds();
-				const double remaining = uav_arm_wait_s_ - elapsed;
-				if (remaining > 0.0) {
-					RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-						"[AUTO] ARM pending — IMU settling... %.1fs remaining", remaining);
-					return;
-				}
-				// Wait complete — clear pending flag and fall through to arm check
-				arm_pending_ = false;
-				RCLCPP_INFO(this->get_logger(), "[AUTO] IMU settle complete, checking odom for ARM");
+		// ── Phase 1: IMU settle wait ──────────────────────────────────────────
+		if (arm_pending_) {
+			const double elapsed   = (this->now() - arm_pending_since_).seconds();
+			const double remaining = arm_imu_wait_s_ - elapsed;
+			if (remaining > 0.0) {
+				RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+					"[AUTO] IMU settling... %.1fs remaining", remaining);
+				return;
 			}
+			arm_pending_ = false;
+			if (!odom_healthy_) {
+				RCLCPP_ERROR(this->get_logger(),
+					"[AUTO] IMU settle complete but odom not healthy — ARM blocked → INACTIVE");
+				offboard_state_ = OffboardState::INACTIVE;
+				return;
+			}
+			last_position_setpoint_ = odom_to_posestamped();
+			send_offboard_mode_command();
+			send_arm_command(true);
+			arm_retry_active_ = true;
+			arm_retry_since_  = this->now();
+			RCLCPP_INFO(this->get_logger(),
+				"[AUTO] IMU settle complete — ARM sent, retry window %.1fs", arm_retry_window_s_);
+			return;
+		}
 
-			// Attempt ARM (also handles odom-recovery re-arm after INACTIVE)
-			if (odom_healthy_) {
-				// Initialise hover setpoint to current odom position so the
-				// heartbeat timer never publishes an uninitialised (0,0,0) target.
-				last_position_setpoint_ = odom_to_posestamped();
-				send_offboard_mode_command();
-				send_arm_command(true);
-				offboard_state_ = OffboardState::TRACKING;
-				RCLCPP_INFO(this->get_logger(), "[AUTO] ARM sent → TRACKING (hover init: %.2f, %.2f, %.2f ENU)",
+		// ── Phase 2: ARM confirmation + retry window ──────────────────────────
+		if (arm_retry_active_) {
+			if (pixhawk_state.arming_state ==
+			    px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED) {
+				arm_retry_active_ = false;
+				offboard_state_   = OffboardState::TRACKING;
+				RCLCPP_INFO(this->get_logger(),
+					"[AUTO] ARM confirmed → TRACKING (hover: %.2f, %.2f, %.2f FLU)",
 					last_position_setpoint_.pose.position.x,
 					last_position_setpoint_.pose.position.y,
 					last_position_setpoint_.pose.position.z);
+				return;
+			}
+			const double elapsed = (this->now() - arm_retry_since_).seconds();
+			if (elapsed >= arm_retry_window_s_) {
+				arm_retry_active_ = false;
+				offboard_state_   = OffboardState::INACTIVE;
+				RCLCPP_ERROR(this->get_logger(),
+					"[AUTO] ARM failed after %.1fs retry window → INACTIVE", arm_retry_window_s_);
+				return;
+			}
+			send_arm_command(true);
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+				"[AUTO] ARM not confirmed (%.1f/%.1fs) — retrying...", elapsed, arm_retry_window_s_);
+			return;
+		}
+
+		// ── INACTIVE: odom-recovery re-arm ────────────────────────────────────
+		if (offboard_state_ == OffboardState::INACTIVE) {
+			if (odom_healthy_) {
+				last_position_setpoint_ = odom_to_posestamped();
+				send_offboard_mode_command();
+				send_arm_command(true);
+				arm_retry_active_ = true;
+				arm_retry_since_  = this->now();
+				offboard_state_   = OffboardState::PRE_ARM;
+				RCLCPP_INFO(this->get_logger(), "[AUTO] odom recovered — ARM retry starting");
 			} else {
 				RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
 					"[AUTO] Waiting for odometry before arming... topic: %s",
@@ -724,22 +832,47 @@ private:
 			return;
 		}
 
-		// DESCENDING: heartbeat timer handles publishing, just log here
+		// ── DESCENDING: heartbeat handles publishing ───────────────────────────
 		if (offboard_state_ == OffboardState::DESCENDING) {
 			return;
 		}
 
-		// TRACKING: update position setpoint cache for the heartbeat timer
+		// ── LANDING: check touchdown sensors ─────────────────────────────────
+		if (offboard_state_ == OffboardState::LANDING) {
+			// Primary: PX4 native land detection
+			if (has_land_detected_ && last_land_detected_.landed) {
+				RCLCPP_INFO(this->get_logger(),
+					"[AUTO] Touchdown confirmed (vehicle_land_detected) → DISARM + A2G");
+				confirm_landing();
+				return;
+			}
+			// Fallback: odom Z velocity stopped for landing_z_stop_dur_ seconds
+			if (odom_healthy_) {
+				const double z_vel = std::abs(last_odom_.twist.twist.linear.z);
+				if (z_vel < landing_z_stop_thr_) {
+					if (!landing_z_stopped_) {
+						landing_z_stopped_    = true;
+						landing_z_stop_start_ = this->now();
+					} else if ((this->now() - landing_z_stop_start_).seconds() >= landing_z_stop_dur_) {
+						RCLCPP_INFO(this->get_logger(),
+							"[AUTO] Touchdown confirmed (odom Z stop fallback) → DISARM + A2G");
+						confirm_landing();
+					}
+				} else {
+					landing_z_stopped_ = false;
+				}
+			}
+			return;
+		}
+
+		// ── TRACKING: update position setpoint cache for the heartbeat timer ──
 		const double wp_age = has_waypoint_
 			? (this->now() - last_waypoint_time_).seconds()
 			: std::numeric_limits<double>::max();
 
 		if (wp_age < waypoint_timeout_s_) {
-			// Fresh waypoint from upstream planner — track it
 			last_position_setpoint_ = latest_waypoint_;
 		} else {
-			// Waypoint stale or never received — hover at current odom position.
-			// If odom also becomes unhealthy, loop() transitions to DESCENDING.
 			if (odom_healthy_) {
 				last_position_setpoint_ = odom_to_posestamped();
 				if (!has_waypoint_) {
@@ -747,11 +880,11 @@ private:
 						"[AUTO] No waypoint received — hovering at odom position");
 				} else {
 					RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-						"[AUTO] Waypoint timeout (%.2fs > %.2fs) — hovering at odom position",
+						"[AUTO] Waypoint timeout (%.2fs > %.2fs) — hovering at odom",
 						wp_age, waypoint_timeout_s_);
 				}
 			}
-			// !odom_healthy_ → loop() odom tick already triggers TRACKING → DESCENDING
+			// !odom_healthy_ → loop() odom tick triggers TRACKING → DESCENDING
 		}
 	}
 
@@ -779,9 +912,11 @@ private:
 				send_stabilized_mode_command();  // exit OFFBOARD so manual RC arming works
 				offboard_state_ = OffboardState::INACTIVE;
 			}
-			arm_pending_      = false;
-			auto_mode_active_ = false;
-			auto_sub_state_   = AutoSubState::IDLE;
+			arm_pending_       = false;
+			arm_retry_active_  = false;
+			landing_z_stopped_ = false;
+			auto_mode_active_  = false;
+			auto_sub_state_    = AutoSubState::IDLE;
 			// Reset prev_auto_switch_ so that re-arming with AUTO switch
 			// still in AUTO position correctly re-triggers AUTO mode activation.
 			prev_auto_switch_ = AutoSwitchState::MANUAL;
@@ -822,9 +957,11 @@ private:
 					send_stabilized_mode_command();  // exit OFFBOARD so manual RC arming works
 					offboard_state_ = OffboardState::INACTIVE;
 				}
-				arm_pending_      = false;
-				auto_mode_active_ = false;
-				auto_sub_state_   = AutoSubState::IDLE;
+				arm_pending_       = false;
+				arm_retry_active_  = false;
+				landing_z_stopped_ = false;
+				auto_mode_active_  = false;
+				auto_sub_state_    = AutoSubState::IDLE;
 				RCLCPP_INFO(this->get_logger(), "[AUTO] AUTO mode deactivated — returning to MANUAL");
 			}
 		}
@@ -838,12 +975,14 @@ private:
 			RCLCPP_ERROR(this->get_logger(),
 				"[AUTO] Odometry timeout! Source: %s topic: %s",
 				odom_source_.c_str(), odom_topic_.c_str());
-			// TRACKING → DESCENDING transition: odom lost mid-flight
-			if (offboard_state_ == OffboardState::TRACKING) {
-				offboard_state_ = OffboardState::DESCENDING;
+			// TRACKING / LANDING → DESCENDING transition: odom lost mid-flight
+			if (offboard_state_ == OffboardState::TRACKING ||
+			    offboard_state_ == OffboardState::LANDING) {
+				offboard_state_    = OffboardState::DESCENDING;
+				landing_z_stopped_ = false;
 				RCLCPP_ERROR(this->get_logger(),
-					"[AUTO] Switching to DESCENDING mode (%.2f m/s). "
-					"Restore odom and resend mode_cmd=1 to resume TRACKING.",
+					"[AUTO] Odom lost — switching to DESCENDING (%.2f m/s). "
+					"Restore odom and resend mode_cmd=1 to resume.",
 					descent_rate_mps_);
 			}
 		}
