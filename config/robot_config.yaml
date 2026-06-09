@@ -127,6 +127,14 @@ config_uav: [90, 0, 90, 0, 90, 0, 90, 0]
 config_mip: [90, 45, 90, 45, 0, 90, 0, 90]
 config_transition_wheel_vel: 150  # In rev/min
 
+# Simulation mode: Gazebo ROS bridge topic prefix
+# topic_prefix: model name prefix used by gz_ros_bridge, e.g. "/Drone1"
+simulation:
+    topic_prefix: "/Drone1"
+    max_linear_vel: 1.0     # m/s  — clamp on drive() input (layer 1)
+    max_angular_vel: 0.5    # rad/s — clamp on drive() input (layer 1)
+    max_wheel_vel: 10.0     # rad/s — clamp on wheel output before publishing (layer 2)
+
 # AUTO mode: odometry source configuration
 # odom_source: "fastlio" | "mocap"
 #   fastlio -> subscribes to odom_topic, forwards to /fmu/in/vehicle_visual_odometry

@@ -7,11 +7,21 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 # Dry execution mode
 set(DRY_EXECUTION_MODE OFF CACHE BOOL "Enable dry execution mode" FORCE)
+
+# Simulation mode (Gazebo + PX4 SITL bridge)
+set(SIMULATION ON CACHE BOOL "Enable Gazebo simulation mode" FORCE)
 if(DRY_EXECUTION_MODE)
-    add_compile_definitions(DRY_EXECUTION_MODE)  
+    add_compile_definitions(DRY_EXECUTION_MODE)
     message(STATUS "✓ DRY_EXECUTION_MODE is ENABLED")
 else()
     message(STATUS "✗ DRY_EXECUTION_MODE is DISABLED")
+endif()
+
+if(SIMULATION)
+    add_compile_definitions(SIMULATION)
+    message(STATUS "✓ SIMULATION mode is ENABLED")
+else()
+    message(STATUS "✗ SIMULATION mode is DISABLED")
 endif()
 
 # Set project root directory
@@ -78,8 +88,12 @@ add_library(m4_base STATIC
     src/M4BaseCpp/M4CommandAPI.cpp
     src/M4BaseCpp/M4Actions.cpp
     src/M4BaseCpp/M4Helpers.cpp
+    src/M4BaseCpp/M4HwBridge.cpp
 )
-target_link_libraries(m4_base PRIVATE DynamixelInterface utils Logger yaml-cpp)
+target_link_libraries(m4_base DynamixelInterface utils Logger yaml-cpp)
+if(SIMULATION)
+    ament_target_dependencies(m4_base rclcpp std_msgs)
+endif()
 
 # Dynamixel SDK
 add_library(dynamixel_sdk STATIC
@@ -141,17 +155,20 @@ function(compile_executable TARGET_NAME SOURCE_FILES LIBRARIES ROS_DEPS)
 endfunction()
 
 
-# Set up unit tests
-foreach(SCRIPT IN LISTS UNIT_TEST_SCRIPTS)
-    set(SOURCES ${PROJECT_SOURCE_DIR}/scripts/unit-tests/${SCRIPT}.cpp)
-    compile_executable(${SCRIPT} "${SOURCES}" "${COMMON_LIBRARIES}" "${ROS_DEPENDENCIES}")
-endforeach()
+# Unit tests and standalone scripts require real hardware constructor — skip in SIMULATION mode
+if(NOT SIMULATION)
+    # Set up unit tests
+    foreach(SCRIPT IN LISTS UNIT_TEST_SCRIPTS)
+        set(SOURCES ${PROJECT_SOURCE_DIR}/scripts/unit-tests/${SCRIPT}.cpp)
+        compile_executable(${SCRIPT} "${SOURCES}" "${COMMON_LIBRARIES}" "${ROS_DEPENDENCIES}")
+    endforeach()
 
-# Set up test scripts
-foreach(SCRIPT IN LISTS SCRIPTS)
-    set(SOURCES ${PROJECT_SOURCE_DIR}/scripts/${SCRIPT}.cpp)
-    compile_executable(${SCRIPT} "${SOURCES}" "${COMMON_LIBRARIES}" "${ROS_DEPENDENCIES}")
-endforeach()
+    # Set up test scripts
+    foreach(SCRIPT IN LISTS SCRIPTS)
+        set(SOURCES ${PROJECT_SOURCE_DIR}/scripts/${SCRIPT}.cpp)
+        compile_executable(${SCRIPT} "${SOURCES}" "${COMMON_LIBRARIES}" "${ROS_DEPENDENCIES}")
+    endforeach()
+endif()
 
 # Set up ROS nodes
 foreach(SCRIPT IN LISTS ROS_NODES)
@@ -161,6 +178,7 @@ endforeach()
 
 add_executable(m4_controller_node
     ${PROJECT_SOURCE_DIR}/scripts/nodes/rc_teleop_controller/m4_controller_node.cpp
+    ${PROJECT_SOURCE_DIR}/scripts/nodes/rc_teleop_controller/m4_controller_auto.cpp
     ${PROJECT_SOURCE_DIR}/scripts/nodes/rc_teleop_controller/src/RCcontroller.cpp
 )
 
@@ -168,13 +186,20 @@ ament_target_dependencies(m4_controller_node ${ROS_DEPENDENCIES})
 target_link_libraries(m4_controller_node ${COMMON_LIBRARIES})
 
 # Install targets
-install(TARGETS
-    ${UNIT_TEST_SCRIPTS}
-	${SCRIPTS}
-	${ROS_NODES}
-    m4_controller_node
-    DESTINATION lib/${PROJECT_NAME}
-)
+if(SIMULATION)
+    install(TARGETS
+        m4_controller_node
+        DESTINATION lib/${PROJECT_NAME}
+    )
+else()
+    install(TARGETS
+        ${UNIT_TEST_SCRIPTS}
+        ${SCRIPTS}
+        ${ROS_NODES}
+        m4_controller_node
+        DESTINATION lib/${PROJECT_NAME}
+    )
+endif()
 
 # Install launch files, config files, etc. if you have any
 install(DIRECTORY launch config

@@ -27,10 +27,16 @@ void M4Base::execute_drive()
 		left_wheel_velocity = ((linear_velocity_cmd + 4 * angular_velocity_cmd * wheel_base / 2.0) / wheel_radius)*360/(2*M_PI);
 	}// MUTEX UNLOCK
 
+#ifdef SIMULATION
+	// Layer 2: clamp wheel speed (deg/s) before publishing — convert rad/s limit to deg/s
+	const float max_wheel_degs = sim_max_wheel_vel_ * 180.0f / M_PI;
+	right_wheel_velocity = std::clamp(right_wheel_velocity, -max_wheel_degs, max_wheel_degs);
+	left_wheel_velocity  = std::clamp(left_wheel_velocity,  -max_wheel_degs, max_wheel_degs);
+#endif
 	std::vector<float> wheel_velocity_list = {left_wheel_velocity, right_wheel_velocity, left_wheel_velocity, right_wheel_velocity};
 	wheel_velocity_cmd = get_active_wheel_velocities(wheel_velocity_list);
 	wheel_velocity_cmd_ids = active_wheel_ids;
-	dxl.write_velocity(wheel_velocity_cmd_ids, wheel_velocity_cmd);
+	hw_write_velocity(wheel_velocity_cmd_ids, wheel_velocity_cmd);
 
 }
  
@@ -53,8 +59,8 @@ void M4Base::execute_stand()
 			// Step 1: Move to Standing
 			if(command_step == 0)
 			{
-			    dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
-				dxl.write_position(active_joint_ids, stand_configuration);
+			    hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
+				hw_write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -64,7 +70,7 @@ void M4Base::execute_stand()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 0.7 && command_step == 1)
 			{
 				printf("[INFO] Stand Transformation complete!\n");
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				command_step = 0;
 				command_active = false;
 				current_configuration = M4Configurations::STAND;
@@ -76,8 +82,8 @@ void M4Base::execute_stand()
 			// Step 1: Move to Standing
 			if(command_step == 0)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
-				dxl.write_position(active_joint_ids, stand_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
+				hw_write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -87,7 +93,7 @@ void M4Base::execute_stand()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 1.5 && command_step == 1)
 			{
 				printf("[INFO] Stand Transformation complete!\n");
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				command_step = 0;
 				command_active = false;
 				current_configuration = M4Configurations::STAND;
@@ -100,9 +106,9 @@ void M4Base::execute_stand()
 			// Step 1: Move to Standing
 			if(command_step == 0)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));
-				dxl.write_position(active_joint_ids, stand_configuration);
+				hw_write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -111,7 +117,7 @@ void M4Base::execute_stand()
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 1.5 && command_step == 1)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Stand Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -129,7 +135,7 @@ void M4Base::execute_stand()
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				hw_write_position(active_joint_ids, uav_step2_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
@@ -138,7 +144,7 @@ void M4Base::execute_stand()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 			{
 				command_step = 2;
-				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				hw_write_position(active_joint_ids, uav_step1_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -146,7 +152,7 @@ void M4Base::execute_stand()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
 			{
 				command_step = 3;
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -154,15 +160,15 @@ void M4Base::execute_stand()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 3)
 			{
 				command_step = 4;
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
-				dxl.write_position(active_joint_ids, stand_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
+				hw_write_position(active_joint_ids, stand_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 1.5 && command_step == 4)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Stand Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -193,8 +199,8 @@ void M4Base::execute_crouch1()
 			// Step 1: Move to crouch1 position
 			if(command_step == 0)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
-				dxl.write_position(active_joint_ids, crouch1_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
+				hw_write_position(active_joint_ids, crouch1_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -203,7 +209,7 @@ void M4Base::execute_crouch1()
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 0.7 && command_step == 1)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -220,8 +226,8 @@ void M4Base::execute_crouch1()
 			// Step 1: Move to crouch1 position
 			if(command_step == 0)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
-				dxl.write_position(active_joint_ids, crouch1_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
+				hw_write_position(active_joint_ids, crouch1_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -230,7 +236,7 @@ void M4Base::execute_crouch1()
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 0.7 && command_step == 1)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -249,7 +255,7 @@ void M4Base::execute_crouch1()
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				hw_write_position(active_joint_ids, uav_step2_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
@@ -258,7 +264,7 @@ void M4Base::execute_crouch1()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 			{
 				command_step = 2;
-				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				hw_write_position(active_joint_ids, uav_step1_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -266,15 +272,15 @@ void M4Base::execute_crouch1()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
 			{
 				command_step = 3;
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
 			// Step 4: Move to crouch1 position
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 3)
 			{
-				dxl.write_position(active_joint_ids, crouch1_configuration);
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
+				hw_write_position(active_joint_ids, crouch1_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
 				gait_start = std::chrono::system_clock::now();
 				command_step = 4;
 				command_active = true;
@@ -283,7 +289,7 @@ void M4Base::execute_crouch1()
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 0.8 && command_step == 4)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -314,8 +320,8 @@ void M4Base::execute_crouch2()
 			// Step 1: Move to crouch2 position
 			if(command_step == 0)
 			{
-				dxl.write_position(active_joint_ids, crouch2_configuration);
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
+				hw_write_position(active_joint_ids, crouch2_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -339,8 +345,8 @@ void M4Base::execute_crouch2()
 			// Step 1: Move to crouch2 position
 			if(command_step == 0)
 			{
-				dxl.write_position(active_joint_ids, crouch2_configuration);
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
+				hw_write_position(active_joint_ids, crouch2_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -365,8 +371,8 @@ void M4Base::execute_crouch2()
 			// Step 1: Move to crouch2 position
 			if(command_step == 0)
 			{
-				dxl.write_position(active_joint_ids, crouch2_configuration);
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
+				hw_write_position(active_joint_ids, crouch2_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -394,7 +400,7 @@ void M4Base::execute_crouch2()
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				hw_write_position(active_joint_ids, uav_step2_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
@@ -403,7 +409,7 @@ void M4Base::execute_crouch2()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 			{
 				command_step = 2;
-				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				hw_write_position(active_joint_ids, uav_step1_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -411,7 +417,7 @@ void M4Base::execute_crouch2()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
 			{
 				command_step = 3;
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -419,15 +425,15 @@ void M4Base::execute_crouch2()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 3)
 			{
 				command_step = 4;
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
 			// Step 5: Move to crouch2 position
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 4)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
-				dxl.write_position(active_joint_ids, crouch2_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_in));
+				hw_write_position(active_joint_ids, crouch2_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 5;
 				command_active = true;
@@ -436,7 +442,7 @@ void M4Base::execute_crouch2()
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 0.2 && command_step == 5)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Crouch Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -471,8 +477,8 @@ void M4Base::execute_sit()
 			// Step 1: Move to sit position
 			if(command_step == 0)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_step = 1;
 				command_active = true;
@@ -481,7 +487,7 @@ void M4Base::execute_sit()
 			// Complete
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 2 && command_step == 1)
 			{
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
 				printf("[INFO] Sit Transformation complete!\n");
 				command_step = 0;
 				command_active = false;
@@ -498,7 +504,7 @@ void M4Base::execute_sit()
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				hw_write_position(active_joint_ids, uav_step2_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
@@ -507,7 +513,7 @@ void M4Base::execute_sit()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 			{
 				command_step = 2;
-				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				hw_write_position(active_joint_ids, uav_step1_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -515,7 +521,7 @@ void M4Base::execute_sit()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
 			{
 				command_step = 3;
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -550,8 +556,8 @@ void M4Base::execute_uav()
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
@@ -560,8 +566,8 @@ void M4Base::execute_uav()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 0.7 && command_step == 1)
 			{
 				command_step = 2;
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
-				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_position(active_joint_ids, uav_step1_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -569,7 +575,7 @@ void M4Base::execute_uav()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
 			{
 				command_step = 3;
-				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				hw_write_position(active_joint_ids, uav_step2_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 			
@@ -591,8 +597,8 @@ void M4Base::execute_uav()
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
@@ -601,8 +607,8 @@ void M4Base::execute_uav()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 1.5 && command_step == 1)
 			{
 				command_step = 2;
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
-				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_position(active_joint_ids, uav_step1_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -610,7 +616,7 @@ void M4Base::execute_uav()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
 			{
 				command_step = 3;
-				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				hw_write_position(active_joint_ids, uav_step2_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 			
@@ -634,8 +640,8 @@ void M4Base::execute_uav()
 			if(command_step == 0)
 			{
 				command_step = 1;
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
-				dxl.write_position(active_joint_ids, sit_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities(transition_wheel_vel_out));
+				hw_write_position(active_joint_ids, sit_configuration);
 				gait_start = std::chrono::system_clock::now();
 				command_active = true;
 			}
@@ -644,8 +650,8 @@ void M4Base::execute_uav()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 0.2 && command_step == 1)
 			{
 				command_step = 2;
-				dxl.write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
-				dxl.write_position(active_joint_ids, uav_step1_configuration);
+				hw_write_velocity(active_wheel_ids, get_active_wheel_velocities({0,0,0,0}));
+				hw_write_position(active_joint_ids, uav_step1_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 
@@ -653,7 +659,7 @@ void M4Base::execute_uav()
 			if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 2)
 			{
 				command_step = 3;
-				dxl.write_position(active_joint_ids, uav_step2_configuration);
+				hw_write_position(active_joint_ids, uav_step2_configuration);
 				gait_start = std::chrono::system_clock::now();
 			}
 			
@@ -687,7 +693,7 @@ void M4Base::execute_mip()
 	// 		if(command_step == 0)
 	// 		{
 	// 			command_step = 1;
-	// 			dxl.write_position(active_joint_ids, sit_configuration);
+	// 			hw_write_position(active_joint_ids, sit_configuration);
 	// 			gait_start = std::chrono::system_clock::now();
 	// 			command_active = true;
 	// 		}
@@ -696,7 +702,7 @@ void M4Base::execute_mip()
 	// 		if(get_duration_secs(gait_start, std::chrono::system_clock::now()) >= 3.5 && command_step == 1)
 	// 		{
 	// 			command_step = 2;
-	// 			dxl.write_position(active_joint_ids, mip_configuration);
+	// 			hw_write_position(active_joint_ids, mip_configuration);
 	// 			gait_start = std::chrono::system_clock::now();
 	// 		}
 

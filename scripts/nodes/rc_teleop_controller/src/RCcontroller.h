@@ -54,6 +54,7 @@ class RCController
 		//TR: 2 Update_1
 		RCController(rclcpp::Node* node) : rc_state_available(false)
 		{
+#ifndef SIMULATION
 			rclcpp::QoS px4_qos(10);
 			px4_qos.best_effort();
 			px4_qos.transient_local();
@@ -64,15 +65,30 @@ class RCController
 				std::bind(&RCController::rc_callback, this, std::placeholders::_1));
 
 			read_radio_config("/config/rc_channel_config.yaml");
+#endif
 		}
 
-		bool get_rc_state_available() const { return rc_state_available.load(); }
+		bool get_rc_state_available() const {
+#ifdef SIMULATION
+			return true;
+#else
+			return rc_state_available.load();
+#endif
+		}
 
 		RCstate get_rc_state()
 		{
+#ifdef SIMULATION
+			return { DriveSwitchState::STAND,
+			         UAVSwitchState::UAV_DISABLE,
+			         ArmSwitchState::GROUND_ARM,
+			         AutoSwitchState::AUTO,
+			         {0.0f, 0.0f} };
+#else
 			rc_state_available = false;
 			return { drive_switch_state, uav_switch_state, arm_switch_state,
 			         auto_switch_state, velocity_joystick_state };
+#endif
 		}
 
 	private:

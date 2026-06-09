@@ -19,15 +19,37 @@
 #include "DynamixelInterface.h"
 #include "M4Base.h"
 
+#ifdef SIMULATION
+#include <std_msgs/msg/float64.hpp>
+#endif
+
 M4Base::M4Base() : linear_velocity_cmd(0.0), angular_velocity_cmd(0.0), log_status(false), quit(false), state_updated(false), command_queue(20), current_configuration(M4Configurations::INIT)
 {
 	// Do nothing, initialize later using init
 }
 
-M4Base::M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status, bool autostart):active_joint_ids(active_joint_ids), active_wheel_ids(active_wheel_ids), linear_velocity_cmd(0.0), angular_velocity_cmd(0.0), log_status(log_status), quit(false), state_updated(false), autostart(autostart), command_queue(20), current_configuration(M4Configurations::INIT)
+// Original hardware constructor:
+// M4Base::M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status, bool autostart): ...
+#ifndef SIMULATION
+M4Base::M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status, bool autostart)
+	: active_joint_ids(active_joint_ids), active_wheel_ids(active_wheel_ids),
+	  linear_velocity_cmd(0.0), angular_velocity_cmd(0.0), log_status(log_status),
+	  quit(false), state_updated(false), autostart(autostart),
+	  command_queue(20), current_configuration(M4Configurations::INIT)
 {
 	init(autostart);
 }
+#else
+M4Base::M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status, rclcpp::Node* ros_node)
+	: active_joint_ids(active_joint_ids), active_wheel_ids(active_wheel_ids),
+	  linear_velocity_cmd(0.0), angular_velocity_cmd(0.0), log_status(log_status),
+	  quit(false), state_updated(false), autostart(true),
+	  command_queue(20), current_configuration(M4Configurations::INIT),
+	  ros_node_(ros_node)
+{
+	init(true);
+}
+#endif
 
 void M4Base::init(bool autostart)
 {
@@ -87,7 +109,29 @@ void M4Base::init(bool autostart)
 	//----------------------------------------------------------------------------------------------------------------
 
 
-	dxl.init(interface_port.c_str(), baudrate, active_joint_ids, active_wheel_ids);
+	#ifdef SIMULATION
+		// dxl.init(interface_port.c_str(), baudrate, active_joint_ids, active_wheel_ids);
+		try {
+			sim_topic_prefix_   = config["simulation"]["topic_prefix"].as<std::string>(sim_topic_prefix_);
+			sim_max_linear_vel_ = config["simulation"]["max_linear_vel"].as<float>(sim_max_linear_vel_);
+			sim_max_angular_vel_= config["simulation"]["max_angular_vel"].as<float>(sim_max_angular_vel_);
+			sim_max_wheel_vel_  = config["simulation"]["max_wheel_vel"].as<float>(sim_max_wheel_vel_);
+		} catch (...) {}
+		for (int i = 0; i < 4; i++) {
+			sim_hip_pubs_[i]   = ros_node_->create_publisher<std_msgs::msg::Float64>(
+				sim_topic_prefix_ + "/servo_hip_"  + std::to_string(i), 10);
+			sim_leg_pubs_[i]   = ros_node_->create_publisher<std_msgs::msg::Float64>(
+				sim_topic_prefix_ + "/servo_leg_"  + std::to_string(i), 10);
+			sim_wheel_pubs_[i] = ros_node_->create_publisher<std_msgs::msg::Float64>(
+				sim_topic_prefix_ + "/vel_wheel_"  + std::to_string(i), 10);
+		}
+		sim_joint_positions_.assign(active_joint_ids.size(), 0.0f);
+		sim_wheel_velocities_.assign(active_wheel_ids.size(), 0.0f);
+		printf("[INFO] SIMULATION mode: Gazebo bridge publishers created (prefix=%s).\n",
+			sim_topic_prefix_.c_str());
+	#else
+		dxl.init(interface_port.c_str(), baudrate, active_joint_ids, active_wheel_ids);
+	#endif
 
 	std::cout<<autostart;
 	if (autostart) {
@@ -109,5 +153,9 @@ M4Base::~M4Base()
 		printf("%s[INFO] Control loop stopped.\n", CONSOLE_MSG_INFO);
 	}
 
-	dxl.stop();
+	#ifndef SIMULATION
+		dxl.stop();
+	#else
+		// dxl.stop();
+	#endif
 }

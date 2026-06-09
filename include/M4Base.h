@@ -8,6 +8,13 @@
 #include "Logger.h"
 #include <mutex>
 
+#ifdef SIMULATION
+#include <array>
+#include <cmath>
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/float64.hpp>
+#endif
+
 enum M4Commands
 {
 	CMD_STAND,
@@ -59,7 +66,13 @@ class M4Base
 {
 	public:
 		M4Base();
+		// Original hardware constructor:
+		// M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status=false, bool autostart=true);
+		#ifndef SIMULATION
 		M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status=false, bool autostart=true);
+		#else
+		M4Base(std::vector<int> active_joint_ids, std::vector<int> active_wheel_ids, bool log_status, rclcpp::Node* ros_node);
+		#endif
 		~M4Base();
 	
 		// Status read functions
@@ -81,6 +94,12 @@ class M4Base
 
 	protected:
 		void init(bool autostart=true); // Used to initialize M4Base
+
+		// ── hw-bridge wrappers (M4HwBridge.cpp) ──
+		// Route hardware calls to either DynamixelInterface (real) or ROS publishers (sim).
+		void hw_write_position(const std::vector<int>& ids, const std::vector<float>& pos);
+		void hw_write_velocity(const std::vector<int>& ids, const std::vector<float>& vel);
+		DynamixelStatus hw_read_status();
 
 		DynamixelInterface dxl;
 		
@@ -172,6 +191,22 @@ class M4Base
 		float linear_velocity_cmd;
 		float angular_velocity_cmd;
 		std::vector<int> wheel_velocity_cmd_ids;
+
+	#ifdef SIMULATION
+		// ── Simulation: ROS node + Gazebo topic publishers ──
+		rclcpp::Node* ros_node_{nullptr};
+		std::string sim_topic_prefix_{"/Drone1"};   // loaded from robot_config.yaml simulation.topic_prefix
+		std::array<rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr, 4> sim_hip_pubs_;
+		std::array<rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr, 4> sim_leg_pubs_;
+		std::array<rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr, 4> sim_wheel_pubs_;
+		// Tracks last commanded state for hw_read_status() synthetic feedback
+		std::vector<float> sim_joint_positions_;
+		std::vector<float> sim_wheel_velocities_;
+		// Velocity limits (loaded from robot_config.yaml simulation section)
+		float sim_max_linear_vel_{1.0f};   // m/s
+		float sim_max_angular_vel_{1.5f};  // rad/s
+		float sim_max_wheel_vel_{10.0f};   // rad/s
+	#endif
 };
 
 #endif

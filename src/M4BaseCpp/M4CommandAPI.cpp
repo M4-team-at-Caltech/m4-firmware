@@ -19,6 +19,10 @@
 
 void M4Base::drive(float lin_vel_cmd, float ang_vel_cmd)
 {
+#ifdef SIMULATION
+	lin_vel_cmd = std::clamp(lin_vel_cmd, -sim_max_linear_vel_,  sim_max_linear_vel_);
+	ang_vel_cmd = std::clamp(ang_vel_cmd, -sim_max_angular_vel_, sim_max_angular_vel_);
+#endif
 	{// MUTEX LOCK
 		std::lock_guard<std::mutex> lock(drive_cmd);
 		linear_velocity_cmd = lin_vel_cmd;

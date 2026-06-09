@@ -15,7 +15,8 @@
 using namespace std;
 void M4Base::update_state()
 {
-	DynamixelStatus status = dxl.read_status();
+	// DynamixelStatus status = dxl.read_status();
+	DynamixelStatus status = hw_read_status();
 	RobotState r;
 	r.timestamp = status.timestamp;
 	r.qj = status.qj;
