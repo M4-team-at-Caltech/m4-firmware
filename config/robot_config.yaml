@@ -142,8 +142,10 @@ simulation:
 # odom_topic: ROS topic name for the odometry input (nav_msgs/Odometry)
 # odom_timeout_s: seconds without odom before declaring unhealthy (blocks aerial ARM)
 auto_mode:
-    odom_source: "fastlio"
-    odom_topic: "/localization/odom"
+    # odom_source: "fastlio"
+    # odom_topic: "/localization/odom"
+    odom_source: "mocap"
+    odom_topic: "/Drone1/groundtruth_odom"
     odom_timeout_s: 0.5
     odom_lost_descent_mps: 0.3   # emergency descent speed (m/s) when odom is lost (DESCENDING state)
     arm_imu_wait_s: 3.0          # wait after UAV transform before sending ARM (IMU settle time)
