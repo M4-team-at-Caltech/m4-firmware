@@ -120,9 +120,7 @@ private:
 
 	// ── LANDING state ──
 	custom_msgs::msg::M4ModeCmd  pending_landing_mode_cmd_{};
-	float        landing_setpoint_x_{0.0f};
-	float        landing_setpoint_y_{0.0f};
-	float        landing_setpoint_z_{0.0f};
+	geometry_msgs::msg::PoseStamped landing_setpoint_ps_;  // cached with frame_id for TF conversion
 	bool         landing_z_stopped_{false};
 	rclcpp::Time landing_z_stop_start_{0, 0, RCL_ROS_TIME};
 

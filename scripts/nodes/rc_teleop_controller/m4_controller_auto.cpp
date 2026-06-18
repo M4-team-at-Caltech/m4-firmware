@@ -79,17 +79,38 @@ void M4ControllerNode::publish_offboard_control_mode(bool position_mode)
 	offboard_control_mode_pub_->publish(msg);
 }
 
-// Publish position setpoint (world/FLU PoseStamped → NED TrajectorySetpoint)
+// Publish position setpoint — transforms PoseStamped from its frame_id to ned_world via TF,
+// then forwards ned_world coordinates directly as PX4 NED setpoint (EV mode).
 void M4ControllerNode::publish_trajectory_setpoint(const geometry_msgs::msg::PoseStamped& wp)
 {
 	px4_msgs::msg::TrajectorySetpoint msg{};
-	msg.timestamp   = this->get_clock()->now().nanoseconds() / 1000;
-	msg.position[0] =  (float)wp.pose.position.x;  // North = FLU Forward
-	msg.position[1] = -(float)wp.pose.position.y;  // East  = -FLU Left
-	msg.position[2] = -(float)wp.pose.position.z;  // Down  = -FLU Up
+	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+
+	const std::string& src = wp.header.frame_id;
+	if (!src.empty() && src != "ned_world") {
+		try {
+			geometry_msgs::msg::TransformStamped tf =
+				tf_buffer_->lookupTransform("ned_world", src, tf2::TimePointZero);
+			geometry_msgs::msg::PoseStamped wp_ned;
+			tf2::doTransform(wp, wp_ned, tf);
+			msg.position[0] = (float)wp_ned.pose.position.x;
+			msg.position[1] = (float)wp_ned.pose.position.y;
+			msg.position[2] = (float)wp_ned.pose.position.z;
+		} catch (const tf2::TransformException& ex) {
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+				"[AUTO] setpoint TF failed (%s) — skipping", ex.what());
+			return;
+		}
+	} else {
+		// frame_id empty or already ned_world — use coordinates directly
+		msg.position[0] = (float)wp.pose.position.x;
+		msg.position[1] = (float)wp.pose.position.y;
+		msg.position[2] = (float)wp.pose.position.z;
+	}
+
 	msg.velocity[0] = msg.velocity[1] = msg.velocity[2]         = NaNf;
 	msg.acceleration[0] = msg.acceleration[1] = msg.acceleration[2] = NaNf;
-	msg.yaw         = NaNf;
+	msg.yaw = NaNf;
 	trajectory_setpoint_pub_->publish(msg);
 }
 
@@ -133,13 +154,10 @@ void M4ControllerNode::offboard_heartbeat_callback()
 			return;
 
 		case OffboardState::LANDING: {
-			landing_setpoint_z_ -= (float)(landing_descent_mps_ * 0.1);
-			geometry_msgs::msg::PoseStamped landing_ps;
-			landing_ps.pose.position.x = landing_setpoint_x_;
-			landing_ps.pose.position.y = landing_setpoint_y_;
-			landing_ps.pose.position.z = landing_setpoint_z_;
+			// Decrement Z in the cached frame (world ENU: z down = decrease toward 0)
+			landing_setpoint_ps_.pose.position.z -= (float)(landing_descent_mps_ * 0.1);
 			publish_offboard_control_mode(true);
-			publish_trajectory_setpoint(landing_ps);
+			publish_trajectory_setpoint(landing_setpoint_ps_);
 			return;
 		}
 	}
@@ -192,7 +210,7 @@ geometry_msgs::msg::PoseStamped M4ControllerNode::odom_to_posestamped() const
 {
 	geometry_msgs::msg::PoseStamped ps;
 	ps.header.stamp    = last_odom_.header.stamp;
-	ps.header.frame_id = "map";
+	ps.header.frame_id = "world";  // OdometryPublisher publishes in world (ENU) frame
 	ps.pose            = last_odom_.pose.pose;
 	const auto& q = ps.pose.orientation;
 	if (std::abs(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z - 1.0) > 0.01) {
@@ -310,10 +328,8 @@ void M4ControllerNode::process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
 	// If actively tracking, initiate controlled landing instead of immediate DISARM
 	if (offboard_state_ == OffboardState::TRACKING) {
 		pending_landing_mode_cmd_ = cmd;
-		landing_setpoint_x_ = (float)last_position_setpoint_.pose.position.x;
-		landing_setpoint_y_ = (float)last_position_setpoint_.pose.position.y;
-		landing_setpoint_z_ = (float)last_position_setpoint_.pose.position.z;
-		landing_z_stopped_  = false;
+		landing_setpoint_ps_      = last_position_setpoint_;  // preserves frame_id for TF
+		landing_z_stopped_        = false;
 		offboard_state_     = OffboardState::LANDING;
 		RCLCPP_INFO(this->get_logger(),
 			"[AUTO] Controlled landing initiated (target mode=%d after touchdown)", mode);
