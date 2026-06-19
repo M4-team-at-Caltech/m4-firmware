@@ -343,9 +343,19 @@ void M4ControllerNode::process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
 		offboard_state_ = OffboardState::INACTIVE;
 	}
 
-	// If coming from UAV config, trigger A2G transform first
+	// If coming from UAV config, wait for PX4 DISARM confirmation before A2G transform
 	if (m4_configuration == M4Configurations::UAV) {
-		RCLCPP_WARN(this->get_logger(), "[AUTO] A2G transform — move to stand");
+		if (pixhawk_state.arming_state ==
+		    px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED)
+		{
+			has_new_mode_cmd_ = true;  // re-queue: retry next loop tick
+			latest_mode_cmd_  = cmd;
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+				"[AUTO] A2G transform pending — waiting for PX4 DISARM (arming_state=%d)",
+				pixhawk_state.arming_state);
+			return;
+		}
+		RCLCPP_WARN(this->get_logger(), "[AUTO] A2G transform — PX4 disarmed, move to stand");
 		#ifndef DRY_EXECUTION_MODE
 			m4->drive(0, 0);
 			m4->stand();
@@ -467,6 +477,10 @@ void M4ControllerNode::execute_auto_aerial()
 
 	// ── INACTIVE: odom-recovery re-arm ────────────────────────────────────
 	if (offboard_state_ == OffboardState::INACTIVE) {
+		// has_new_mode_cmd_ means a ground cmd is pending disarm confirmation
+		// (set by the A2G re-queue path) — do NOT re-arm in this case
+		if (has_new_mode_cmd_) return;
+
 		if (odom_healthy_) {
 			last_position_setpoint_ = odom_to_posestamped();
 			send_offboard_mode_command();

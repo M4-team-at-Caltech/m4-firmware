@@ -225,6 +225,7 @@ void M4ControllerNode::loop()
 		landing_z_stopped_ = false;
 		auto_mode_active_  = false;
 		auto_sub_state_    = AutoSubState::IDLE;
+		has_new_mode_cmd_  = false;  // discard any pending A2G re-queue
 		// Reset so re-arming with AUTO switch still in AUTO re-triggers activation.
 		prev_auto_switch_ = AutoSwitchState::MANUAL;
 		publish_mode_status();
@@ -267,6 +268,7 @@ void M4ControllerNode::loop()
 			landing_z_stopped_ = false;
 			auto_mode_active_  = false;
 			auto_sub_state_    = AutoSubState::IDLE;
+			has_new_mode_cmd_  = false;  // discard any pending A2G re-queue
 			RCLCPP_INFO(this->get_logger(), "[AUTO] AUTO mode deactivated — returning to MANUAL");
 		}
 	}
@@ -315,19 +317,28 @@ void M4ControllerNode::loop()
 	if (rc_state.arm_switch_state == ArmSwitchState::GROUND_ARM) {
 		if (rc_state.uav_switch_state == UAVSwitchState::UAV_DISABLE)
 		{// Drive Mode
-			for (const auto& handler : drive_mode_transition_handler)
+			// Guard: block A2G transform until PX4 confirms disarmed
+			if (m4_configuration == M4Configurations::UAV &&
+			    pixhawk_state.arming_state ==
+			    px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED)
 			{
-				if (rc_state.drive_switch_state == handler.state &&
-				    m4_configuration != handler.configuration)
+				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+					"[MANUAL] A2G transform blocked — waiting for PX4 DISARM");
+			} else {
+				for (const auto& handler : drive_mode_transition_handler)
 				{
-					RCLCPP_WARN(this->get_logger(), "%s", handler.message);
-					#ifndef DRY_EXECUTION_MODE
-						(m4->*handler.action)();
-						m4_configuration = m4->get_current_configuration();
-					#else
-						m4_configuration = handler.configuration;
-					#endif
-					break;
+					if (rc_state.drive_switch_state == handler.state &&
+					    m4_configuration != handler.configuration)
+					{
+						RCLCPP_WARN(this->get_logger(), "%s", handler.message);
+						#ifndef DRY_EXECUTION_MODE
+							(m4->*handler.action)();
+							m4_configuration = m4->get_current_configuration();
+						#else
+							m4_configuration = handler.configuration;
+						#endif
+						break;
+					}
 				}
 			}
 			#ifndef DRY_EXECUTION_MODE
