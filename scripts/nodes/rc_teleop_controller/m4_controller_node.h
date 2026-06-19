@@ -117,6 +117,7 @@ private:
 	bool         arm_retry_active_{false};
 	rclcpp::Time arm_retry_since_{0, 0, RCL_ROS_TIME};
 	double       arm_retry_window_s_{3.0};
+	bool         arm_failed_{false};   // set when retry window expires; blocks INACTIVE auto-rearm
 
 	// ── LANDING state ──
 	custom_msgs::msg::M4ModeCmd  pending_landing_mode_cmd_{};

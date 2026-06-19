@@ -302,6 +302,7 @@ void M4ControllerNode::process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
 
 	// ── mode 1: UAV (aerial) ──────────────────────────────────────────
 	if (mode == 1) {
+		arm_failed_ = false;  // new command clears previous failure so retry is allowed
 		if (m4_configuration != M4Configurations::UAV) {
 			RCLCPP_WARN(this->get_logger(), "[AUTO] Move to uav");
 			#ifndef DRY_EXECUTION_MODE
@@ -464,6 +465,7 @@ void M4ControllerNode::execute_auto_aerial()
 		const double elapsed = (this->now() - arm_retry_since_).seconds();
 		if (elapsed >= arm_retry_window_s_) {
 			arm_retry_active_ = false;
+			arm_failed_       = true;   // prevent INACTIVE path from auto-retrying
 			offboard_state_   = OffboardState::INACTIVE;
 			RCLCPP_ERROR(this->get_logger(),
 				"[AUTO] ARM failed after %.1fs retry window → INACTIVE", arm_retry_window_s_);
@@ -480,6 +482,9 @@ void M4ControllerNode::execute_auto_aerial()
 		// has_new_mode_cmd_ means a ground cmd is pending disarm confirmation
 		// (set by the A2G re-queue path) — do NOT re-arm in this case
 		if (has_new_mode_cmd_) return;
+		// arm_failed_ means the retry window already expired — do NOT auto-retry;
+		// operator must resend mode_cmd=1 to try again
+		if (arm_failed_) return;
 
 		if (odom_healthy_) {
 			last_position_setpoint_ = odom_to_posestamped();

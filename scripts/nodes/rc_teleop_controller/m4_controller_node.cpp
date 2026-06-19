@@ -222,6 +222,7 @@ void M4ControllerNode::loop()
 		}
 		arm_pending_       = false;
 		arm_retry_active_  = false;
+		arm_failed_        = false;
 		landing_z_stopped_ = false;
 		auto_mode_active_  = false;
 		auto_sub_state_    = AutoSubState::IDLE;
@@ -265,6 +266,7 @@ void M4ControllerNode::loop()
 			}
 			arm_pending_       = false;
 			arm_retry_active_  = false;
+			arm_failed_        = false;
 			landing_z_stopped_ = false;
 			auto_mode_active_  = false;
 			auto_sub_state_    = AutoSubState::IDLE;
