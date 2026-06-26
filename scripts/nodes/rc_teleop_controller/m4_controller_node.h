@@ -25,6 +25,7 @@
 
 #include <custom_msgs/msg/m4_mode_cmd.hpp>
 #include <custom_msgs/msg/m4_mode_status.hpp>
+#include <custom_msgs/msg/m4_trajectory_setpoint.hpp>
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -90,6 +91,7 @@ private:
 	// ── AUTO mode: subscribers ──
 	rclcpp::Subscription<custom_msgs::msg::M4ModeCmd>::SharedPtr      auto_mode_cmd_sub_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr  auto_waypoint_sub_;
+	rclcpp::Subscription<custom_msgs::msg::M4TrajectorySetpoint>::SharedPtr auto_trajectory_sub_;  // F2 PVA
 	rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr        auto_cmd_vel_sub_;
 	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr          odom_sub_;
 
@@ -100,6 +102,11 @@ private:
 	double      descent_rate_mps_{0.3};   // downward speed when odom is lost (DESCENDING)
 	double      arm_imu_wait_s_{3.0};     // wait after G2A transform before ARM (IMU settle)
 	double      waypoint_timeout_s_{2.0}; // aerial waypoint staleness threshold
+	// F2 setpoint input format (must match executor's setpoint_source):
+	//   "pose" -> consume PoseStamped on /auto/waypoint (position + yaw)
+	//   "pva"  -> consume M4TrajectorySetpoint on /auto/trajectory_waypoint (PVA + yaw)
+	std::string setpoint_source_{"pose"};
+	bool        pva_input_{false};        // cached (setpoint_source_ == "pva")
 	double      landing_descent_mps_{0.3};  // controlled descent rate during LANDING (m/s)
 	double      landing_z_stop_thr_{0.05};  // odom Z velocity threshold to detect touchdown
 	double      landing_z_stop_dur_{1.0};   // seconds Z must stay below threshold to confirm touchdown
@@ -152,6 +159,11 @@ private:
 	geometry_msgs::msg::PoseStamped latest_waypoint_;
 	geometry_msgs::msg::PoseStamped last_position_setpoint_;  // cache for heartbeat timer
 
+	// F2 PVA input cache (mirror of the waypoint cache, used when pva_input_)
+	bool         has_pva_{false};
+	rclcpp::Time last_pva_time_{0, 0, RCL_ROS_TIME};
+	custom_msgs::msg::M4TrajectorySetpoint latest_pva_;
+
 	bool         has_cmd_vel_{false};
 	rclcpp::Time last_cmd_vel_time_{0, 0, RCL_ROS_TIME};
 	geometry_msgs::msg::Twist latest_cmd_vel_;
@@ -171,10 +183,15 @@ private:
 	void vehicle_land_detected_callback(const px4_msgs::msg::VehicleLandDetected::SharedPtr msg);
 	void mode_cmd_callback(const custom_msgs::msg::M4ModeCmd::SharedPtr msg);
 	void waypoint_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+	void trajectory_setpoint_pva_callback(const custom_msgs::msg::M4TrajectorySetpoint::SharedPtr msg);
 	void cmd_vel_callback(const geometry_msgs::msg::Twist::SharedPtr msg);
 	void confirm_landing();
-	void publish_offboard_control_mode(bool position_mode);
+	// pva=true sets position+velocity+acceleration control (PVA feed-forward); otherwise
+	// position_mode selects position(true) vs velocity(false) control.
+	void publish_offboard_control_mode(bool position_mode, bool pva = false);
 	void publish_trajectory_setpoint(const geometry_msgs::msg::PoseStamped& wp);
+	void publish_trajectory_setpoint_pva(const custom_msgs::msg::M4TrajectorySetpoint& sp);
+	float setpoint_yaw_ned(const geometry_msgs::msg::Quaternion& ori_nedworld) const;
 	void publish_descent_setpoint();
 	void offboard_heartbeat_callback();
 	static int32_t config_to_int(M4Configurations cfg);

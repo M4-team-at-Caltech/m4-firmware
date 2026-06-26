@@ -148,9 +148,13 @@ auto_mode:
     odom_topic: "/Drone1/groundtruth_odom"
     odom_timeout_s: 0.5
     odom_lost_descent_mps: 0.3   # emergency descent speed (m/s) when odom is lost (DESCENDING state)
-    arm_imu_wait_s: 3.0          # wait after UAV transform before sending ARM (IMU settle time)
-    arm_retry_window_s: 3.0      # max time to retry ARM after each attempt (seconds)
+    arm_imu_wait_s: 5.0          # wait after UAV transform before sending ARM (IMU settle time)
+    arm_retry_window_s: 10.0      # max time to retry ARM after each attempt (seconds)
     waypoint_timeout_s: 2.0      # aerial waypoint staleness threshold; hover at current odom if exceeded
+    # F2 setpoint input format (must match executor's setpoint_source):
+    #   "pose" -> /auto/waypoint (PoseStamped, position + yaw)
+    #   "pva"  -> /auto/trajectory_waypoint (M4TrajectorySetpoint, position+velocity+acceleration + yaw)
+    setpoint_source: "pva"
     landing_descent_mps: 0.3     # controlled descent rate during LANDING (m/s, pending calibration)
     landing_z_stop_thr: 0.05     # odom Z velocity threshold to detect touchdown (m/s, fallback)
     landing_z_stop_dur: 1.0      # seconds Z velocity must stay below threshold to confirm touchdown

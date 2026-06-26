@@ -58,6 +58,10 @@ M4ControllerNode::M4ControllerNode(
 		"/auto/waypoint", 10,
 		std::bind(&M4ControllerNode::waypoint_callback, this, _1));
 
+	auto_trajectory_sub_ = this->create_subscription<custom_msgs::msg::M4TrajectorySetpoint>(
+		"/auto/trajectory_waypoint", 10,
+		std::bind(&M4ControllerNode::trajectory_setpoint_pva_callback, this, _1));
+
 	auto_cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
 		"/auto/cmd_vel", 10,
 		std::bind(&M4ControllerNode::cmd_vel_callback, this, _1));

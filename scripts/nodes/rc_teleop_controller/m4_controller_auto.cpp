@@ -2,6 +2,8 @@
 
 #include <yaml-cpp/yaml.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -26,11 +28,19 @@ void M4ControllerNode::load_auto_config()
 			landing_descent_mps_ = cfg["auto_mode"]["landing_descent_mps"].as<double>(landing_descent_mps_);
 			landing_z_stop_thr_  = cfg["auto_mode"]["landing_z_stop_thr"].as<double>(landing_z_stop_thr_);
 			landing_z_stop_dur_  = cfg["auto_mode"]["landing_z_stop_dur"].as<double>(landing_z_stop_dur_);
+			setpoint_source_     = cfg["auto_mode"]["setpoint_source"].as<std::string>(setpoint_source_);
 		}
 	} catch (const std::exception& e) {
 		RCLCPP_WARN(this->get_logger(),
 			"[m4_controller_node] Could not load auto_mode config: %s. Using defaults.", e.what());
 	}
+	if (setpoint_source_ != "pose" && setpoint_source_ != "pva") {
+		RCLCPP_WARN(this->get_logger(),
+			"[AUTO] invalid setpoint_source '%s' -> falling back to 'pose'", setpoint_source_.c_str());
+		setpoint_source_ = "pose";
+	}
+	pva_input_ = (setpoint_source_ == "pva");
+	RCLCPP_INFO(this->get_logger(), "[AUTO] setpoint_source = %s", setpoint_source_.c_str());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,6 +67,19 @@ void M4ControllerNode::waypoint_callback(const geometry_msgs::msg::PoseStamped::
 	last_position_setpoint_ = *msg;
 }
 
+void M4ControllerNode::trajectory_setpoint_pva_callback(
+	const custom_msgs::msg::M4TrajectorySetpoint::SharedPtr msg)
+{
+	latest_pva_     = *msg;
+	last_pva_time_  = this->now();
+	has_pva_        = true;
+	// also feed the pose cache so landing / odom-lost fallbacks keep a valid position
+	// target (frame_id preserved for TF), and so a pva->pose handoff is seamless.
+	last_position_setpoint_.header      = msg->header;
+	last_position_setpoint_.pose.position    = msg->position;
+	last_position_setpoint_.pose.orientation = msg->orientation;
+}
+
 void M4ControllerNode::cmd_vel_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
 {
 	latest_cmd_vel_    = *msg;
@@ -67,35 +90,60 @@ void M4ControllerNode::cmd_vel_callback(const geometry_msgs::msg::Twist::SharedP
 // ─────────────────────────────────────────────────────────────────────────────
 // PX4 offboard publish helpers
 // ─────────────────────────────────────────────────────────────────────────────
-void M4ControllerNode::publish_offboard_control_mode(bool position_mode)
+void M4ControllerNode::publish_offboard_control_mode(bool position_mode, bool pva)
 {
 	px4_msgs::msg::OffboardControlMode msg{};
 	msg.timestamp    = this->get_clock()->now().nanoseconds() / 1000;
-	msg.position     = position_mode;
-	msg.velocity     = !position_mode;
-	msg.acceleration = false;
+	// PVA: position control with velocity + acceleration feed-forward (all enabled).
+	// Otherwise position_mode selects pure position (true) or velocity (false) control.
+	msg.position     = pva ? true : position_mode;
+	msg.velocity     = pva ? true : !position_mode;
+	msg.acceleration = pva;
 	msg.attitude     = false;
 	msg.body_rate    = false;
 	offboard_control_mode_pub_->publish(msg);
 }
 
+// Convert a desired heading quaternion (already expressed in ned_world, but still
+// FLU-body convention as it came from the planner) into a PX4 NED yaw, matching the
+// odom convention (FRD-in-NED). convert_odom_flu_to_ned() obtains odom q through the
+// full chain ned_world<-world<-...<-base_link<-ned_base_link, whose final static link
+// (base_link->ned_base_link, 180 deg about X) flips FLU body to FRD. We apply the same
+// 180-deg-about-X body correction on the right so the streamed yaw uses the identical
+// frame as the odom feedback. Returns NaN (heading uncontrolled) for a null quaternion.
+float M4ControllerNode::setpoint_yaw_ned(const geometry_msgs::msg::Quaternion& ori_nedworld) const
+{
+	tf2::Quaternion q_flu;
+	tf2::fromMsg(ori_nedworld, q_flu);
+	if (q_flu.length2() < 1e-6) return NaNf;  // no orientation provided
+	tf2::Quaternion q_x180;
+	q_x180.setRPY(M_PI, 0.0, 0.0);            // FLU body -> FRD body (same as ned_base_link link)
+	const tf2::Quaternion q_frd = q_flu * q_x180;
+	double roll, pitch, yaw;
+	tf2::Matrix3x3(q_frd).getRPY(roll, pitch, yaw);
+	return (float)yaw;
+}
+
 // Publish position setpoint — transforms PoseStamped from its frame_id to ned_world via TF,
-// then forwards ned_world coordinates directly as PX4 NED setpoint (EV mode).
+// then forwards ned_world coordinates directly as PX4 NED setpoint (EV mode). Heading
+// (yaw) is taken from the waypoint orientation (F1) so the planner controls facing.
 void M4ControllerNode::publish_trajectory_setpoint(const geometry_msgs::msg::PoseStamped& wp)
 {
 	px4_msgs::msg::TrajectorySetpoint msg{};
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 
 	const std::string& src = wp.header.frame_id;
+	geometry_msgs::msg::Quaternion ori_nedworld;  // wp heading expressed in ned_world (FLU body)
 	if (!src.empty() && src != "ned_world") {
 		try {
 			geometry_msgs::msg::TransformStamped tf =
 				tf_buffer_->lookupTransform("ned_world", src, tf2::TimePointZero);
 			geometry_msgs::msg::PoseStamped wp_ned;
-			tf2::doTransform(wp, wp_ned, tf);
+			tf2::doTransform(wp, wp_ned, tf);  // rotates BOTH position and orientation
 			msg.position[0] = (float)wp_ned.pose.position.x;
 			msg.position[1] = (float)wp_ned.pose.position.y;
 			msg.position[2] = (float)wp_ned.pose.position.z;
+			ori_nedworld    = wp_ned.pose.orientation;
 		} catch (const tf2::TransformException& ex) {
 			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
 				"[AUTO] setpoint TF failed (%s) — skipping", ex.what());
@@ -106,11 +154,68 @@ void M4ControllerNode::publish_trajectory_setpoint(const geometry_msgs::msg::Pos
 		msg.position[0] = (float)wp.pose.position.x;
 		msg.position[1] = (float)wp.pose.position.y;
 		msg.position[2] = (float)wp.pose.position.z;
+		ori_nedworld    = wp.pose.orientation;
 	}
 
 	msg.velocity[0] = msg.velocity[1] = msg.velocity[2]         = NaNf;
 	msg.acceleration[0] = msg.acceleration[1] = msg.acceleration[2] = NaNf;
-	msg.yaw = NaNf;
+	msg.yaw = setpoint_yaw_ned(ori_nedworld);  // F1: track planner heading (NaN if none)
+	trajectory_setpoint_pub_->publish(msg);
+}
+
+// Publish a full PVA setpoint (F2). Position + heading are converted to the PX4 NED frame
+// exactly like publish_trajectory_setpoint (same TF path); velocity & acceleration are
+// rotated into ned_world as feed-forward. Inputs are in sp.header.frame_id (odom ENU).
+// NaN components pass through (PX4 leaves that axis uncontrolled).
+void M4ControllerNode::publish_trajectory_setpoint_pva(const custom_msgs::msg::M4TrajectorySetpoint& sp)
+{
+	px4_msgs::msg::TrajectorySetpoint msg{};
+	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+
+	const std::string& src = sp.header.frame_id;
+	geometry_msgs::msg::Quaternion ori_nedworld;
+	geometry_msgs::msg::Vector3 vel_ned = sp.velocity;      // default: already in target frame
+	geometry_msgs::msg::Vector3 acc_ned = sp.acceleration;
+	if (!src.empty() && src != "ned_world") {
+		try {
+			geometry_msgs::msg::TransformStamped tf =
+				tf_buffer_->lookupTransform("ned_world", src, tf2::TimePointZero);
+			// position + orientation: rotate both via a PoseStamped (same as waypoint)
+			geometry_msgs::msg::PoseStamped wp, wp_ned;
+			wp.header           = sp.header;
+			wp.pose.position    = sp.position;
+			wp.pose.orientation = sp.orientation;
+			tf2::doTransform(wp, wp_ned, tf);
+			msg.position[0] = (float)wp_ned.pose.position.x;
+			msg.position[1] = (float)wp_ned.pose.position.y;
+			msg.position[2] = (float)wp_ned.pose.position.z;
+			ori_nedworld    = wp_ned.pose.orientation;
+			// velocity / acceleration: rotation only (Vector3 ignores translation)
+			geometry_msgs::msg::Vector3Stamped vin, vout;
+			vin.header = sp.header;
+			vin.vector = sp.velocity;     tf2::doTransform(vin, vout, tf); vel_ned = vout.vector;
+			vin.vector = sp.acceleration; tf2::doTransform(vin, vout, tf); acc_ned = vout.vector;
+		} catch (const tf2::TransformException& ex) {
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+				"[AUTO] pva setpoint TF failed (%s) — skipping", ex.what());
+			return;
+		}
+	} else {
+		msg.position[0] = (float)sp.position.x;
+		msg.position[1] = (float)sp.position.y;
+		msg.position[2] = (float)sp.position.z;
+		ori_nedworld    = sp.orientation;
+	}
+
+	msg.velocity[0]     = (float)vel_ned.x;
+	msg.velocity[1]     = (float)vel_ned.y;
+	msg.velocity[2]     = (float)vel_ned.z;
+	msg.acceleration[0] = (float)acc_ned.x;
+	msg.acceleration[1] = (float)acc_ned.y;
+	msg.acceleration[2] = (float)acc_ned.z;
+	msg.yaw      = setpoint_yaw_ned(ori_nedworld);  // F1 helper
+	// yawspeed: ENU up axis -> NED down axis (sign flip); NaN passes through
+	msg.yawspeed = std::isnan(sp.yawspeed) ? NaNf : (float)(-sp.yawspeed);
 	trajectory_setpoint_pub_->publish(msg);
 }
 
@@ -141,10 +246,21 @@ void M4ControllerNode::offboard_heartbeat_callback()
 			publish_offboard_control_mode(true);
 			return;
 
-		case OffboardState::TRACKING:
-			publish_offboard_control_mode(true);
-			publish_trajectory_setpoint(last_position_setpoint_);
+		case OffboardState::TRACKING: {
+			// F2: in pva mode, stream the full PVA setpoint while it is fresh; fall back to
+			// the cached position setpoint (pose path) otherwise. The cached position is kept
+			// current by the pva callback too, so the fallback is seamless.
+			const bool pva_fresh = pva_input_ && has_pva_ &&
+				(this->now() - last_pva_time_).seconds() < waypoint_timeout_s_;
+			if (pva_fresh) {
+				publish_offboard_control_mode(true, /*pva=*/true);
+				publish_trajectory_setpoint_pva(latest_pva_);
+			} else {
+				publish_offboard_control_mode(true);
+				publish_trajectory_setpoint(last_position_setpoint_);
+			}
 			return;
+		}
 
 		case OffboardState::DESCENDING:
 			publish_offboard_control_mode(false);
@@ -534,6 +650,21 @@ void M4ControllerNode::execute_auto_aerial()
 	}
 
 	// ── TRACKING: update position setpoint cache for the heartbeat timer ──
+	// F2 pva mode: the pva callback keeps last_position_setpoint_ current while PVA is
+	// fresh; on staleness fall back to an odom hover target (mirrors the pose path below).
+	if (pva_input_) {
+		const double pva_age = has_pva_
+			? (this->now() - last_pva_time_).seconds()
+			: std::numeric_limits<double>::max();
+		if (pva_age >= waypoint_timeout_s_ && odom_healthy_) {
+			last_position_setpoint_ = odom_to_posestamped();
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+				has_pva_ ? "[AUTO] trajectory_waypoint timeout — hovering at odom"
+				         : "[AUTO] No trajectory_waypoint received — hovering at odom");
+		}
+		return;
+	}
+
 	const double wp_age = has_waypoint_
 		? (this->now() - last_waypoint_time_).seconds()
 		: std::numeric_limits<double>::max();
