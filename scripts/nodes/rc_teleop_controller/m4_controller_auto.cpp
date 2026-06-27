@@ -625,12 +625,14 @@ void M4ControllerNode::execute_auto_aerial()
 
 	// ── LANDING: check touchdown ───────────────────────────────────────────
 	if (offboard_state_ == OffboardState::LANDING) {
-		if (has_land_detected_ && last_land_detected_.landed) {
-			RCLCPP_INFO(this->get_logger(),
-				"[AUTO] Touchdown confirmed (vehicle_land_detected) → DISARM + A2G");
-			confirm_landing();
-			return;
-		}
+		// Touchdown requires BOTH conditions; otherwise keep the controlled descent:
+		//   (1) vertical motion stopped: |z_vel| < landing_z_stop_thr_ held for
+		//       landing_z_stop_dur_, AND
+		//   (2) PX4 land detector reports landed.
+		// Either alone false-positives — a stable hover has z_vel≈0, which trips the
+		// z-stop the instant LANDING begins; requiring land_detected too prevents a
+		// mid-air DISARM (throttle zeroed while still airborne).
+		bool z_stopped = false;
 		if (odom_healthy_) {
 			const double z_vel = std::abs(last_odom_.twist.twist.linear.z);
 			if (z_vel < landing_z_stop_thr_) {
@@ -638,13 +640,17 @@ void M4ControllerNode::execute_auto_aerial()
 					landing_z_stopped_    = true;
 					landing_z_stop_start_ = this->now();
 				} else if ((this->now() - landing_z_stop_start_).seconds() >= landing_z_stop_dur_) {
-					RCLCPP_INFO(this->get_logger(),
-						"[AUTO] Touchdown confirmed (odom Z stop fallback) → DISARM + A2G");
-					confirm_landing();
+					z_stopped = true;
 				}
 			} else {
 				landing_z_stopped_ = false;
 			}
+		}
+		const bool land_detected = has_land_detected_ && last_land_detected_.landed;
+		if (z_stopped && land_detected) {
+			RCLCPP_INFO(this->get_logger(),
+				"[AUTO] Touchdown confirmed (z-stop + land_detected) → DISARM + A2G");
+			confirm_landing();
 		}
 		return;
 	}
