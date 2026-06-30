@@ -627,11 +627,14 @@ void M4ControllerNode::execute_auto_aerial()
 	if (offboard_state_ == OffboardState::LANDING) {
 		// Touchdown requires BOTH conditions; otherwise keep the controlled descent:
 		//   (1) vertical motion stopped: |z_vel| < landing_z_stop_thr_ held for
-		//       landing_z_stop_dur_, AND
-		//   (2) PX4 land detector reports landed.
-		// Either alone false-positives — a stable hover has z_vel≈0, which trips the
-		// z-stop the instant LANDING begins; requiring land_detected too prevents a
-		// mid-air DISARM (throttle zeroed while still airborne).
+		//       landing_z_stop_dur_ (odom Z velocity — NOT ground height, so rugged
+		//       terrain / planner ground-height error does not affect it), AND
+		//   (2) PX4 reports has_low_throttle (position controller cut throttle because the
+		//       vehicle is supported by the ground). PX4's `landed` is unreliable during an
+		//       offboard position-controlled descent (it needs at_rest/ground_contact which
+		//       don't trip), but has_low_throttle does. A normal hover does NOT set
+		//       has_low_throttle, so it gates out the hover z-stop false-positive; z-stop
+		//       gates out the descent phase (z_vel high) → together = on the ground.
 		bool z_stopped = false;
 		if (odom_healthy_) {
 			const double z_vel = std::abs(last_odom_.twist.twist.linear.z);
@@ -646,10 +649,10 @@ void M4ControllerNode::execute_auto_aerial()
 				landing_z_stopped_ = false;
 			}
 		}
-		const bool land_detected = has_land_detected_ && last_land_detected_.landed;
-		if (z_stopped && land_detected) {
+		const bool low_throttle = has_land_detected_ && last_land_detected_.has_low_throttle;
+		if (z_stopped && low_throttle) {
 			RCLCPP_INFO(this->get_logger(),
-				"[AUTO] Touchdown confirmed (z-stop + land_detected) → DISARM + A2G");
+				"[AUTO] Touchdown confirmed (z-stop + low_throttle) → DISARM + A2G");
 			confirm_landing();
 		}
 		return;

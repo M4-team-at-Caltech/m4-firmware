@@ -155,6 +155,7 @@ auto_mode:
     #   "pose" -> /auto/waypoint (PoseStamped, position + yaw)
     #   "pva"  -> /auto/trajectory_waypoint (M4TrajectorySetpoint, position+velocity+acceleration + yaw)
     setpoint_source: "pva"
+    # setpoint_source: "pose"
     landing_descent_mps: 0.3     # controlled descent rate during LANDING (m/s, pending calibration)
     landing_z_stop_thr: 0.05     # odom Z velocity threshold to detect touchdown (m/s, fallback)
     landing_z_stop_dur: 1.0      # seconds Z velocity must stay below threshold to confirm touchdown
