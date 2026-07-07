@@ -231,6 +231,7 @@ void M4ControllerNode::loop()
 		auto_mode_active_  = false;
 		auto_sub_state_    = AutoSubState::IDLE;
 		has_new_mode_cmd_  = false;  // discard any pending A2G re-queue
+		post_landing_disarm_guard_ = false;  // explicit kill switch overrides the guard
 		// Reset so re-arming with AUTO switch still in AUTO re-triggers activation.
 		prev_auto_switch_ = AutoSwitchState::MANUAL;
 		publish_mode_status();
@@ -264,8 +265,24 @@ void M4ControllerNode::loop()
 	if (rc_state.auto_switch_state == AutoSwitchState::MANUAL) {
 		if (auto_mode_active_) {
 			if (offboard_state_ != OffboardState::INACTIVE) {
-				send_arm_command(false);
-				send_stabilized_mode_command();
+				const bool airborne =
+					m4_configuration == M4Configurations::UAV &&
+					pixhawk_state.arming_state ==
+						px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;
+				if (airborne) {
+					// In-air handover (see auto_mode_DevNote 十七): keep ARMED, hand the
+					// vehicle to the pilot in STABILIZED (the trained takeover procedure).
+					// The old unconditional DISARM only "worked" because PX4 rejects
+					// in-flight disarm without the force param — one parameter away from
+					// cutting the motors mid-air.
+					send_stabilized_mode_command();
+					RCLCPP_WARN(this->get_logger(),
+						"[AUTO] AUTO->MANUAL in air: PX4 -> STABILIZED, staying ARMED "
+						"(pilot takeover)");
+				} else {
+					send_arm_command(false);
+					send_stabilized_mode_command();
+				}
 				offboard_state_ = OffboardState::INACTIVE;
 			}
 			arm_pending_       = false;
@@ -275,6 +292,7 @@ void M4ControllerNode::loop()
 			auto_mode_active_  = false;
 			auto_sub_state_    = AutoSubState::IDLE;
 			has_new_mode_cmd_  = false;  // discard any pending A2G re-queue
+			post_landing_disarm_guard_ = false;  // manual re-arm is the pilot's call
 			RCLCPP_INFO(this->get_logger(), "[AUTO] AUTO mode deactivated — returning to MANUAL");
 		}
 	}
@@ -303,6 +321,25 @@ void M4ControllerNode::loop()
 	// [③] AUTO mode
 	// ────────────────────────────────────────────────────────────────────
 	if (auto_mode_active_) {
+		// Post-landing disarm guard: PX4's RC arm switch is level-triggered — with the
+		// pilot's switch still in an ARM position plus residual throttle, PX4 re-arms
+		// right after the touchdown DISARM and the vehicle takes off again. Until the
+		// A2G transform completes (config leaves UAV), actively disarm any re-arm.
+		// Cleared by: A2G completion, an explicit mode_cmd=1, AUTO exit, kill switch.
+		if (post_landing_disarm_guard_) {
+			if (m4_configuration != M4Configurations::UAV) {
+				post_landing_disarm_guard_ = false;   // A2G done — guard no longer needed
+			} else if (offboard_state_ == OffboardState::INACTIVE &&
+			           pixhawk_state.arming_state ==
+			               px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED &&
+			           (this->now() - last_guard_disarm_).seconds() > 0.5) {
+				last_guard_disarm_ = this->now();
+				send_arm_command(false);
+				RCLCPP_WARN(this->get_logger(),
+					"[AUTO] post-landing guard: PX4 re-armed (RC arm switch/throttle?) "
+					"-> DISARM (awaiting A2G)");
+			}
+		}
 		if (has_new_mode_cmd_) {
 			has_new_mode_cmd_ = false;
 			process_mode_cmd(latest_mode_cmd_);

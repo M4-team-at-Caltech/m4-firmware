@@ -402,6 +402,10 @@ void M4ControllerNode::confirm_landing()
 	landing_z_stopped_ = false;
 	has_new_mode_cmd_ = true;
 	latest_mode_cmd_  = pending_landing_mode_cmd_;
+	// arm the post-landing disarm guard: until the A2G transform completes, any PX4
+	// re-arm (level-triggered RC arm switch + residual throttle) is actively disarmed
+	// again in loop() — re-takeoff must go through an explicit mode_cmd=1.
+	post_landing_disarm_guard_ = true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -419,6 +423,7 @@ void M4ControllerNode::process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
 	// ── mode 1: UAV (aerial) ──────────────────────────────────────────
 	if (mode == 1) {
 		arm_failed_ = false;  // new command clears previous failure so retry is allowed
+		post_landing_disarm_guard_ = false;  // explicit takeoff request lifts the guard
 		if (m4_configuration != M4Configurations::UAV) {
 			RCLCPP_WARN(this->get_logger(), "[AUTO] Move to uav");
 			#ifndef DRY_EXECUTION_MODE
@@ -666,9 +671,15 @@ void M4ControllerNode::execute_auto_aerial()
 			? (this->now() - last_pva_time_).seconds()
 			: std::numeric_limits<double>::max();
 		if (pva_age >= waypoint_timeout_s_ && odom_healthy_) {
-			last_position_setpoint_ = odom_to_posestamped();
+			// Hover at the LAST COMMANDED waypoint, not at odom: last_position_setpoint_
+			// already caches the last PVA position (see trajectory_setpoint_pva_callback),
+			// so simply DON'T overwrite it. Holding the commanded target keeps the vehicle
+			// converging to where the planner wanted it (e.g. finishing a climb) instead of
+			// freezing mid-way at whatever pose the timeout caught it in. Odom fallback only
+			// when no waypoint was ever received (nothing better to hold).
+			if (!has_pva_) last_position_setpoint_ = odom_to_posestamped();
 			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-				has_pva_ ? "[AUTO] trajectory_waypoint timeout — hovering at odom"
+				has_pva_ ? "[AUTO] trajectory_waypoint timeout — hovering at last waypoint"
 				         : "[AUTO] No trajectory_waypoint received — hovering at odom");
 		}
 		return;
@@ -682,14 +693,18 @@ void M4ControllerNode::execute_auto_aerial()
 		last_position_setpoint_ = latest_waypoint_;
 	} else {
 		if (odom_healthy_) {
-			last_position_setpoint_ = odom_to_posestamped();
-			if (!has_waypoint_) {
+			if (has_waypoint_) {
+				// Hover at the LAST COMMANDED waypoint (keep converging to the planner's
+				// last target, e.g. finish a climb) instead of freezing at odom mid-way.
+				last_position_setpoint_ = latest_waypoint_;
+				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+					"[AUTO] Waypoint timeout (%.2fs > %.2fs) — hovering at last waypoint",
+					wp_age, waypoint_timeout_s_);
+			} else {
+				// never received any waypoint: odom hover is the only sane target
+				last_position_setpoint_ = odom_to_posestamped();
 				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
 					"[AUTO] No waypoint received — hovering at odom position");
-			} else {
-				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-					"[AUTO] Waypoint timeout (%.2fs > %.2fs) — hovering at odom",
-					wp_age, waypoint_timeout_s_);
 			}
 		}
 		// !odom_healthy_ → loop() odom tick triggers TRACKING → DESCENDING

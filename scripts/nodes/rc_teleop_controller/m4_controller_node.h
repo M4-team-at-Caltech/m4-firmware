@@ -135,6 +135,13 @@ private:
 	bool         has_land_detected_{false};
 	px4_msgs::msg::VehicleLandDetected last_land_detected_{};
 	rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr vehicle_land_detected_sub_;
+	// Post-landing disarm guard: from touchdown (confirm_landing) until the A2G transform
+	// completes, actively enforce DISARM. PX4's RC arm switch is level-triggered — with the
+	// pilot's switch still in ARM and residual throttle, PX4 can re-arm right after our
+	// touchdown DISARM and take off again. Re-takeoff must go through an explicit action
+	// (a new mode_cmd=1 clears the guard).
+	bool         post_landing_disarm_guard_{false};
+	rclcpp::Time last_guard_disarm_{0, 0, RCL_ROS_TIME};
 
 	// ── Offboard state machine ──
 	//   INACTIVE   : heartbeat not sent, PX4 not in offboard
