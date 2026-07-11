@@ -469,7 +469,30 @@ void M4ControllerNode::process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
 		return;
 	}
 
-	// Deactivate offboard if in other aerial states (PRE_ARM / DESCENDING)
+	// Guard (2026-07-10 incident): a REPEAT ground mode_cmd while LANDING is already in
+	// progress (e.g. the executor's A2G firing after a manual mode0 started the landing)
+	// must NOT fall through to the deactivation branch below — that branch DISARMs
+	// (denied mid-air) and then unconditionally switches STABILIZED + kills the offboard
+	// heartbeat, leaving an armed aircraft with no position hold. Landing is idempotent:
+	// refresh the queued post-touchdown target and keep descending.
+	if (offboard_state_ == OffboardState::LANDING) {
+		pending_landing_mode_cmd_ = cmd;
+		RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+			"[AUTO] mode_cmd=%d while LANDING — landing already in progress (target queued)",
+			mode);
+		return;
+	}
+	// Same mid-air hazard for DESCENDING (odom lost, airborne velocity descent): ignore
+	// ground commands until the descent completes / odom is restored.
+	if (offboard_state_ == OffboardState::DESCENDING) {
+		RCLCPP_WARN(this->get_logger(),
+			"[AUTO] mode_cmd=%d ignored during DESCENDING (odom-lost descent in progress)",
+			mode);
+		return;
+	}
+
+	// Deactivate offboard if in the remaining aerial state (PRE_ARM — on the ground,
+	// disarm is safe there)
 	if (offboard_state_ != OffboardState::INACTIVE) {
 		send_arm_command(false);
 		send_stabilized_mode_command();
