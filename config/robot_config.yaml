@@ -159,3 +159,5 @@ auto_mode:
     landing_descent_mps: 0.3     # controlled descent rate during LANDING (m/s, pending calibration)
     landing_z_stop_thr: 0.05     # odom Z velocity threshold to detect touchdown (m/s, fallback)
     landing_z_stop_dur: 1.0      # seconds Z velocity must stay below threshold to confirm touchdown
+    landing_lowthr_frames: 30    # layer-1: consecutive 20Hz frames has_low_throttle must hold (~1.5s)
+    landing_disarm_timeout_s: 1.5 # layer-2: wait for PX4 DISARM confirm; denied -> resume descent

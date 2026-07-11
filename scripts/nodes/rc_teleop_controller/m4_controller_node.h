@@ -110,6 +110,19 @@ private:
 	double      landing_descent_mps_{0.3};  // controlled descent rate during LANDING (m/s)
 	double      landing_z_stop_thr_{0.05};  // odom Z velocity threshold to detect touchdown
 	double      landing_z_stop_dur_{1.0};   // seconds Z must stay below threshold to confirm touchdown
+	// Touchdown false-positive protection (2026-07-10, two layers):
+	// layer 1 — PX4's has_low_throttle is an instantaneous, hysteresis-free flag that also
+	// trips mid-air when the unbounded landing setpoint saturates the descent controller;
+	// require it to hold for N consecutive loop() frames (20Hz; 30 ≈ 1.5s) before it counts.
+	int         landing_lowthr_frames_{30};
+	int         landing_lowthr_count_{0};
+	// layer 2 — transactional DISARM: send DISARM, keep the offboard heartbeat alive with a
+	// FROZEN setpoint, and only proceed (STABILIZED + heartbeat stop + A2G queue) once PX4
+	// confirms disarm; on denial ("not landed") resume the controlled descent instead of
+	// dropping the aircraft into armed STABILIZED with no position hold.
+	bool         landing_disarm_wait_{false};
+	rclcpp::Time landing_disarm_deadline_;
+	double       landing_disarm_timeout_s_{1.5};
 
 	// ── AUTO mode: high-level state ──
 	bool            auto_mode_active_{false};

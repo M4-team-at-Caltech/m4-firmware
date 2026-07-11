@@ -28,6 +28,8 @@ void M4ControllerNode::load_auto_config()
 			landing_descent_mps_ = cfg["auto_mode"]["landing_descent_mps"].as<double>(landing_descent_mps_);
 			landing_z_stop_thr_  = cfg["auto_mode"]["landing_z_stop_thr"].as<double>(landing_z_stop_thr_);
 			landing_z_stop_dur_  = cfg["auto_mode"]["landing_z_stop_dur"].as<double>(landing_z_stop_dur_);
+			landing_lowthr_frames_    = cfg["auto_mode"]["landing_lowthr_frames"].as<int>(landing_lowthr_frames_);
+			landing_disarm_timeout_s_ = cfg["auto_mode"]["landing_disarm_timeout_s"].as<double>(landing_disarm_timeout_s_);
 			setpoint_source_     = cfg["auto_mode"]["setpoint_source"].as<std::string>(setpoint_source_);
 		}
 	} catch (const std::exception& e) {
@@ -270,8 +272,13 @@ void M4ControllerNode::offboard_heartbeat_callback()
 			return;
 
 		case OffboardState::LANDING: {
-			// Decrement Z in the cached frame (world ENU: z down = decrease toward 0)
-			landing_setpoint_ps_.pose.position.z -= (float)(landing_descent_mps_ * 0.1);
+			// Decrement Z in the cached frame (world ENU: z down = decrease toward 0).
+			// While awaiting DISARM confirmation the setpoint is FROZEN (no decrement)
+			// but the offboard stream keeps publishing — a denial must never leave a
+			// signal gap (that gap was the "offboard signal lost" in the 2026-07-10
+			// mid-air incident).
+			if (!landing_disarm_wait_)
+				landing_setpoint_ps_.pose.position.z -= (float)(landing_descent_mps_ * 0.1);
 			publish_offboard_control_mode(true);
 			publish_trajectory_setpoint(landing_setpoint_ps_);
 			return;
@@ -396,7 +403,9 @@ px4_msgs::msg::VehicleOdometry M4ControllerNode::convert_odom_flu_to_ned(
 // ─────────────────────────────────────────────────────────────────────────────
 void M4ControllerNode::confirm_landing()
 {
-	send_arm_command(false);
+	// NOTE (2026-07-10): the DISARM is now sent BEFORE this function, in the LANDING
+	// touchdown branch; this finalizer runs only after PX4 confirmed the disarm
+	// (layer-2 transactional landing). Never call it while PX4 is still ARMED.
 	send_stabilized_mode_command();
 	offboard_state_    = OffboardState::INACTIVE;
 	landing_z_stopped_ = false;
@@ -452,6 +461,8 @@ void M4ControllerNode::process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
 		pending_landing_mode_cmd_ = cmd;
 		landing_setpoint_ps_      = last_position_setpoint_;  // preserves frame_id for TF
 		landing_z_stopped_        = false;
+		landing_lowthr_count_     = 0;      // re-arm layer-1 debounce
+		landing_disarm_wait_      = false;  // re-arm layer-2 transaction
 		offboard_state_     = OffboardState::LANDING;
 		RCLCPP_INFO(this->get_logger(),
 			"[AUTO] Controlled landing initiated (target mode=%d after touchdown)", mode);
@@ -630,6 +641,27 @@ void M4ControllerNode::execute_auto_aerial()
 
 	// ── LANDING: check touchdown ───────────────────────────────────────────
 	if (offboard_state_ == OffboardState::LANDING) {
+		// Layer 2 — transactional DISARM. While waiting: the heartbeat keeps the
+		// offboard stream alive with a FROZEN setpoint (no further z decrement), so a
+		// PX4 denial ("Disarming denied, not landed") can never leave the aircraft in
+		// armed STABILIZED with no position hold (2026-07-10 hardware incident).
+		if (landing_disarm_wait_) {
+			if (pixhawk_state.arming_state !=
+			    px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED) {
+				RCLCPP_INFO(this->get_logger(),
+					"[AUTO] PX4 DISARM confirmed → STABILIZED + A2G");
+				landing_disarm_wait_ = false;
+				confirm_landing();
+			} else if (this->now() > landing_disarm_deadline_) {
+				RCLCPP_ERROR(this->get_logger(),
+					"[AUTO] DISARM denied/timeout (PX4 still ARMED, likely mid-air) "
+					"→ resuming controlled descent");
+				landing_disarm_wait_  = false;
+				landing_z_stopped_    = false;   // re-arm both detection layers
+				landing_lowthr_count_ = 0;
+			}
+			return;
+		}
 		// Touchdown requires BOTH conditions; otherwise keep the controlled descent:
 		//   (1) vertical motion stopped: |z_vel| < landing_z_stop_thr_ held for
 		//       landing_z_stop_dur_ (odom Z velocity — NOT ground height, so rugged
@@ -654,11 +686,23 @@ void M4ControllerNode::execute_auto_aerial()
 				landing_z_stopped_ = false;
 			}
 		}
-		const bool low_throttle = has_land_detected_ && last_land_detected_.has_low_throttle;
+		// Layer 1 — debounce has_low_throttle: it is an instantaneous PX4 flag with no
+		// hysteresis, and it also trips MID-AIR when the unbounded landing setpoint
+		// saturates the descent controller (thrust pushed into the bottom 10% of the
+		// min→hover band). Count consecutive loop() frames (20Hz): only a sustained
+		// low-throttle (default 30 frames ≈ 1.5s) passes.
+		const bool lowthr_now = has_land_detected_ && last_land_detected_.has_low_throttle;
+		landing_lowthr_count_ = lowthr_now ? landing_lowthr_count_ + 1 : 0;
+		const bool low_throttle = landing_lowthr_count_ >= landing_lowthr_frames_;
 		if (z_stopped && low_throttle) {
 			RCLCPP_INFO(this->get_logger(),
-				"[AUTO] Touchdown confirmed (z-stop + low_throttle) → DISARM + A2G");
-			confirm_landing();
+				"[AUTO] Touchdown detected (z-stop + low_throttle x%d frames) "
+				"→ DISARM sent, awaiting PX4 confirmation",
+				landing_lowthr_count_);
+			send_arm_command(false);
+			landing_disarm_wait_     = true;
+			landing_disarm_deadline_ = this->now() +
+				rclcpp::Duration::from_seconds(landing_disarm_timeout_s_);
 		}
 		return;
 	}
