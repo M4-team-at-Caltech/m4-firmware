@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <deque>
 #include <atomic>
 #include <cmath>
 #include <limits>
@@ -123,6 +124,14 @@ private:
 	bool         landing_disarm_wait_{false};
 	rclcpp::Time landing_disarm_deadline_;
 	double       landing_disarm_timeout_s_{1.5};
+	// 3a (2026-07-11): PX4's own 'landed' flag can lag the first DISARM (denied "not
+	// landed" on a real touchdown) — keep re-sending DISARM every 0.5s inside the wait
+	// window instead of one-shot + timeout.
+	rclcpp::Time landing_disarm_last_send_;
+	// 3b (2026-07-11): touchdown z-stop from POSITION differentiation over a ~0.5s
+	// window — odom twist proved unreliable (zero or vibration-noisy depending on the
+	// LIO source). Ring of (sample time, odom z), pruned to the window each loop tick.
+	std::deque<std::pair<rclcpp::Time, double>> landing_z_hist_;
 
 	// ── AUTO mode: high-level state ──
 	bool            auto_mode_active_{false};

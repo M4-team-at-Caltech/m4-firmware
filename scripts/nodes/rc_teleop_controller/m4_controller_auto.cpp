@@ -463,6 +463,7 @@ void M4ControllerNode::process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd)
 		landing_z_stopped_        = false;
 		landing_lowthr_count_     = 0;      // re-arm layer-1 debounce
 		landing_disarm_wait_      = false;  // re-arm layer-2 transaction
+		landing_z_hist_.clear();            // 3b: fresh differentiation window
 		offboard_state_     = OffboardState::LANDING;
 		RCLCPP_INFO(this->get_logger(),
 			"[AUTO] Controlled landing initiated (target mode=%d after touchdown)", mode);
@@ -682,6 +683,11 @@ void M4ControllerNode::execute_auto_aerial()
 				landing_disarm_wait_  = false;
 				landing_z_stopped_    = false;   // re-arm both detection layers
 				landing_lowthr_count_ = 0;
+			} else if ((this->now() - landing_disarm_last_send_).seconds() >= 0.5) {
+				// 3a: PX4 'landed' may lag the first DISARM on a real touchdown —
+				// re-send inside the window rather than one-shot + full timeout.
+				send_arm_command(false);
+				landing_disarm_last_send_ = this->now();
 			}
 			return;
 		}
@@ -697,16 +703,29 @@ void M4ControllerNode::execute_auto_aerial()
 		//       gates out the descent phase (z_vel high) → together = on the ground.
 		bool z_stopped = false;
 		if (odom_healthy_) {
-			const double z_vel = std::abs(last_odom_.twist.twist.linear.z);
-			if (z_vel < landing_z_stop_thr_) {
-				if (!landing_z_stopped_) {
-					landing_z_stopped_    = true;
-					landing_z_stop_start_ = this->now();
-				} else if ((this->now() - landing_z_stop_start_).seconds() >= landing_z_stop_dur_) {
-					z_stopped = true;
+			// 3b: z velocity from POSITION differentiation over a ~0.5s window (odom
+			// twist proved unreliable — zero or vibration-noisy depending on the LIO
+			// source). Window too short right after LANDING entry -> not stopped yet.
+			const rclcpp::Time tnow = this->now();
+			landing_z_hist_.emplace_back(tnow, last_odom_.pose.pose.position.z);
+			while (!landing_z_hist_.empty() &&
+			       (tnow - landing_z_hist_.front().first).seconds() > 0.6)
+				landing_z_hist_.pop_front();
+			const double span = (tnow - landing_z_hist_.front().first).seconds();
+			if (span >= 0.3) {
+				const double z_vel = std::abs(
+					(last_odom_.pose.pose.position.z - landing_z_hist_.front().second)
+					/ span);
+				if (z_vel < landing_z_stop_thr_) {
+					if (!landing_z_stopped_) {
+						landing_z_stopped_    = true;
+						landing_z_stop_start_ = this->now();
+					} else if ((this->now() - landing_z_stop_start_).seconds() >= landing_z_stop_dur_) {
+						z_stopped = true;
+					}
+				} else {
+					landing_z_stopped_ = false;
 				}
-			} else {
-				landing_z_stopped_ = false;
 			}
 		}
 		// Layer 1 — debounce has_low_throttle: it is an instantaneous PX4 flag with no
@@ -723,8 +742,9 @@ void M4ControllerNode::execute_auto_aerial()
 				"→ DISARM sent, awaiting PX4 confirmation",
 				landing_lowthr_count_);
 			send_arm_command(false);
-			landing_disarm_wait_     = true;
-			landing_disarm_deadline_ = this->now() +
+			landing_disarm_wait_      = true;
+			landing_disarm_last_send_ = this->now();
+			landing_disarm_deadline_  = this->now() +
 				rclcpp::Duration::from_seconds(landing_disarm_timeout_s_);
 		}
 		return;
