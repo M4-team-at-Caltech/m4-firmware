@@ -154,13 +154,14 @@ void M4ControllerNode::send_vehicle_command(uint16_t command, float param1, floa
 	vehicle_command_publisher_->publish(cmd);
 }
 
-void M4ControllerNode::send_arm_command(bool arm)
+void M4ControllerNode::send_arm_command(bool arm, bool force)
 {
 	send_vehicle_command(
 		px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM,
-		arm ? 1.0f : 0.0f);
-	RCLCPP_INFO(this->get_logger(), "[AUTO] UAV %s command sent to PX4",
-		arm ? "ARM" : "DISARM");
+		arm ? 1.0f : 0.0f,
+		force ? 21196.0f : 0.0f);   // MAVLink force code: bypass the landed check
+	RCLCPP_INFO(this->get_logger(), "[AUTO] UAV %s%s command sent to PX4",
+		arm ? "ARM" : "DISARM", force ? " (FORCE)" : "");
 }
 
 void M4ControllerNode::send_offboard_mode_command()

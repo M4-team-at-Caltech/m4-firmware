@@ -123,7 +123,12 @@ private:
 	// dropping the aircraft into armed STABILIZED with no position hold.
 	bool         landing_disarm_wait_{false};
 	rclcpp::Time landing_disarm_deadline_;
-	double       landing_disarm_timeout_s_{1.5};
+	rclcpp::Time landing_disarm_wait_start_;
+	double       landing_disarm_timeout_s_{6.0};  // failsafe resume-descent (force should win first)
+	double       landing_detect_vz_{0.7};         // [m/s] commanded descent AFTER touchdown
+	                                              // (>= 0.9*MPC_LAND_SPEED=0.63 unlocks PX4 land detect;
+	                                              // harmless on the ground — nothing actually moves)
+	double       landing_force_disarm_s_{3.0};    // normal disarm window before 21196 force (0=never force)
 	// 3a (2026-07-11): PX4's own 'landed' flag can lag the first DISARM (denied "not
 	// landed" on a real touchdown) — keep re-sending DISARM every 0.5s inside the wait
 	// window instead of one-shot + timeout.
@@ -200,7 +205,15 @@ private:
 	// ── Core methods (m4_controller_node.cpp) ──
 	void init_controller();
 	void send_vehicle_command(uint16_t command, float param1 = 0.0f, float param2 = 0.0f);
-	void send_arm_command(bool arm);
+	// force=true appends MAVLink magic 21196 (bypass PX4's landed check — used ONLY by
+	// the landing flow after OUR two-layer touchdown detection confirmed ground).
+	void send_arm_command(bool arm, bool force = false);
+	// Post-touchdown land-detect assist setpoint: xy position hold (TF path), z
+	// position released (NaN), z VELOCITY = +landing_detect_vz_ (NED down). PX4's
+	// MulticopterLandDetector requires a FINITE commanded descent >= 0.9*MPC_LAND_SPEED
+	// for _in_descend/ground_contact — pose-only setpoints (vz=NaN) make it
+	// structurally blind (2026-07-13 ulog analysis: 21s of "Disarming denied").
+	void publish_landing_detect_setpoint();
 	void send_offboard_mode_command();
 	void send_stabilized_mode_command();
 	void state_callback(const px4_msgs::msg::VehicleStatus::SharedPtr msg);

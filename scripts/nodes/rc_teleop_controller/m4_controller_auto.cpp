@@ -30,6 +30,8 @@ void M4ControllerNode::load_auto_config()
 			landing_z_stop_dur_  = cfg["auto_mode"]["landing_z_stop_dur"].as<double>(landing_z_stop_dur_);
 			landing_lowthr_frames_    = cfg["auto_mode"]["landing_lowthr_frames"].as<int>(landing_lowthr_frames_);
 			landing_disarm_timeout_s_ = cfg["auto_mode"]["landing_disarm_timeout_s"].as<double>(landing_disarm_timeout_s_);
+			landing_detect_vz_        = cfg["auto_mode"]["landing_detect_vz"].as<double>(landing_detect_vz_);
+			landing_force_disarm_s_   = cfg["auto_mode"]["landing_force_disarm_s"].as<double>(landing_force_disarm_s_);
 			setpoint_source_     = cfg["auto_mode"]["setpoint_source"].as<std::string>(setpoint_source_);
 		}
 	} catch (const std::exception& e) {
@@ -165,6 +167,44 @@ void M4ControllerNode::publish_trajectory_setpoint(const geometry_msgs::msg::Pos
 	trajectory_setpoint_pub_->publish(msg);
 }
 
+// Post-touchdown land-detect assist (2026-07-13): xy position hold from the cached
+// landing setpoint (same TF path as publish_trajectory_setpoint), z position RELEASED,
+// z velocity = +landing_detect_vz_ (NED down). See header note for the PX4 rationale.
+void M4ControllerNode::publish_landing_detect_setpoint()
+{
+	px4_msgs::msg::TrajectorySetpoint msg{};
+	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+
+	const geometry_msgs::msg::PoseStamped& wp = landing_setpoint_ps_;
+	const std::string& src = wp.header.frame_id;
+	geometry_msgs::msg::Quaternion ori_nedworld;
+	if (!src.empty() && src != "ned_world") {
+		try {
+			geometry_msgs::msg::TransformStamped tf =
+				tf_buffer_->lookupTransform("ned_world", src, tf2::TimePointZero);
+			geometry_msgs::msg::PoseStamped wp_ned;
+			tf2::doTransform(wp, wp_ned, tf);
+			msg.position[0] = (float)wp_ned.pose.position.x;
+			msg.position[1] = (float)wp_ned.pose.position.y;
+			ori_nedworld    = wp_ned.pose.orientation;
+		} catch (const tf2::TransformException& ex) {
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+				"[AUTO] landing-detect setpoint TF failed (%s) — skipping", ex.what());
+			return;
+		}
+	} else {
+		msg.position[0] = (float)wp.pose.position.x;
+		msg.position[1] = (float)wp.pose.position.y;
+		ori_nedworld    = wp.pose.orientation;
+	}
+	msg.position[2] = NaNf;                              // z position released
+	msg.velocity[0] = msg.velocity[1] = NaNf;
+	msg.velocity[2] = (float)landing_detect_vz_;         // NED: positive = down
+	msg.acceleration[0] = msg.acceleration[1] = msg.acceleration[2] = NaNf;
+	msg.yaw = setpoint_yaw_ned(ori_nedworld);
+	trajectory_setpoint_pub_->publish(msg);
+}
+
 // Publish a full PVA setpoint (F2). Position + heading are converted to the PX4 NED frame
 // exactly like publish_trajectory_setpoint (same TF path); velocity & acceleration are
 // rotated into ned_world as feed-forward. Inputs are in sp.header.frame_id (odom ENU).
@@ -272,15 +312,22 @@ void M4ControllerNode::offboard_heartbeat_callback()
 			return;
 
 		case OffboardState::LANDING: {
-			// Decrement Z in the cached frame (world ENU: z down = decrease toward 0).
-			// While awaiting DISARM confirmation the setpoint is FROZEN (no decrement)
-			// but the offboard stream keeps publishing — a denial must never leave a
-			// signal gap (that gap was the "offboard signal lost" in the 2026-07-10
-			// mid-air incident).
-			if (!landing_disarm_wait_)
+			if (landing_disarm_wait_) {
+				// Touchdown confirmed (our two-layer detection): switch to the
+				// land-detect assist setpoint — xy position hold, z position released,
+				// z VELOCITY = +landing_detect_vz_ (NED). PX4's land detector needs a
+				// FINITE commanded descent >= 0.9*MPC_LAND_SPEED to declare ground
+				// contact; pose-only setpoints (vz=NaN) keep it blind forever
+				// (2026-07-13 ulog: 21s of "Disarming denied: not landed"). Harmless
+				// on the ground — nothing actually moves. The stream never gaps.
+				publish_offboard_control_mode(true, /*pva=*/true);
+				publish_landing_detect_setpoint();
+			} else {
+				// Descent phase unchanged: position z decrement in the cached frame.
 				landing_setpoint_ps_.pose.position.z -= (float)(landing_descent_mps_ * 0.1);
-			publish_offboard_control_mode(true);
-			publish_trajectory_setpoint(landing_setpoint_ps_);
+				publish_offboard_control_mode(true);
+				publish_trajectory_setpoint(landing_setpoint_ps_);
+			}
 			return;
 		}
 	}
@@ -686,7 +733,14 @@ void M4ControllerNode::execute_auto_aerial()
 			} else if ((this->now() - landing_disarm_last_send_).seconds() >= 0.5) {
 				// 3a: PX4 'landed' may lag the first DISARM on a real touchdown —
 				// re-send inside the window rather than one-shot + full timeout.
-				send_arm_command(false);
+				// After landing_force_disarm_s_ of denials, escalate to FORCE (21196):
+				// our own touchdown detection is the authority (see header note).
+				const bool force = landing_force_disarm_s_ > 0.0 &&
+					(this->now() - landing_disarm_wait_start_).seconds() >= landing_force_disarm_s_;
+				if (force)
+					RCLCPP_WARN(this->get_logger(),
+						"[AUTO] normal DISARM window expired — escalating to FORCE disarm");
+				send_arm_command(false, force);
 				landing_disarm_last_send_ = this->now();
 			}
 			return;
@@ -742,9 +796,10 @@ void M4ControllerNode::execute_auto_aerial()
 				"→ DISARM sent, awaiting PX4 confirmation",
 				landing_lowthr_count_);
 			send_arm_command(false);
-			landing_disarm_wait_      = true;
-			landing_disarm_last_send_ = this->now();
-			landing_disarm_deadline_  = this->now() +
+			landing_disarm_wait_       = true;
+			landing_disarm_last_send_  = this->now();
+			landing_disarm_wait_start_ = this->now();
+			landing_disarm_deadline_   = this->now() +
 				rclcpp::Duration::from_seconds(landing_disarm_timeout_s_);
 		}
 		return;
