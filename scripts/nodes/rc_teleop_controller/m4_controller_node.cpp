@@ -193,10 +193,12 @@ void M4ControllerNode::odom_callback(const nav_msgs::msg::Odometry::SharedPtr ms
 	odom_healthy_   = true;
 
 	try {
-		vehicle_odom_pub_->publish(convert_odom_flu_to_ned(*msg));
+		vehicle_odom_pub_->publish(relocal_mode_ ? convert_odom_flu_to_ned_relocal(*msg)
+		                                          : convert_odom_flu_to_ned(*msg));
 	} catch (const tf2::TransformException& e) {
 		RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-			"[odom] TF ned_base_link→ned_world not ready: %s", e.what());
+			"[odom] TF ned_base_link→%s not ready: %s",
+			relocal_mode_ ? "ned_map" : "ned_world", e.what());
 	}
 }
 

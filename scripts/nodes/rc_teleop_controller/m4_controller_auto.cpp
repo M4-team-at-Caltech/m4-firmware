@@ -33,6 +33,7 @@ void M4ControllerNode::load_auto_config()
 			landing_detect_vz_        = cfg["auto_mode"]["landing_detect_vz"].as<double>(landing_detect_vz_);
 			landing_force_disarm_s_   = cfg["auto_mode"]["landing_force_disarm_s"].as<double>(landing_force_disarm_s_);
 			setpoint_source_     = cfg["auto_mode"]["setpoint_source"].as<std::string>(setpoint_source_);
+			localization_mode_   = cfg["auto_mode"]["localization_mode"].as<std::string>(localization_mode_);
 		}
 	} catch (const std::exception& e) {
 		RCLCPP_WARN(this->get_logger(),
@@ -44,7 +45,16 @@ void M4ControllerNode::load_auto_config()
 		setpoint_source_ = "pose";
 	}
 	pva_input_ = (setpoint_source_ == "pva");
-	RCLCPP_INFO(this->get_logger(), "[AUTO] setpoint_source = %s", setpoint_source_.c_str());
+	if (localization_mode_ != "localization" && localization_mode_ != "relocalization") {
+		RCLCPP_WARN(this->get_logger(),
+			"[AUTO] invalid localization_mode '%s' -> falling back to 'localization'",
+			localization_mode_.c_str());
+		localization_mode_ = "localization";
+	}
+	relocal_mode_ = (localization_mode_ == "relocalization");
+	RCLCPP_INFO(this->get_logger(), "[AUTO] setpoint_source = %s, localization_mode = %s (NED anchor: %s)",
+		setpoint_source_.c_str(), localization_mode_.c_str(),
+		relocal_mode_ ? "ned_map" : "ned_world");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,6 +138,15 @@ float M4ControllerNode::setpoint_yaw_ned(const geometry_msgs::msg::Quaternion& o
 	return (float)yaw;
 }
 
+// NED anchor frame for setpoint conversion: ned_map (relocalization, scan_lock
+// global) or ned_world (localization, pure fastlio). map→ned_map is a static TF
+// (added in m4_relocalization.launch.py), so lookupTransform resolves without
+// depending on scan_lock convergence — same TF path as the ned_world case.
+const char* M4ControllerNode::ned_anchor_frame() const
+{
+	return relocal_mode_ ? "ned_map" : "ned_world";
+}
+
 // Publish position setpoint — transforms PoseStamped from its frame_id to ned_world via TF,
 // then forwards ned_world coordinates directly as PX4 NED setpoint (EV mode). Heading
 // (yaw) is taken from the waypoint orientation (F1) so the planner controls facing.
@@ -137,11 +156,12 @@ void M4ControllerNode::publish_trajectory_setpoint(const geometry_msgs::msg::Pos
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 
 	const std::string& src = wp.header.frame_id;
-	geometry_msgs::msg::Quaternion ori_nedworld;  // wp heading expressed in ned_world (FLU body)
-	if (!src.empty() && src != "ned_world") {
+	const std::string anchor = ned_anchor_frame();
+	geometry_msgs::msg::Quaternion ori_nedworld;  // wp heading expressed in ned anchor (FLU body)
+	if (!src.empty() && src != anchor) {
 		try {
 			geometry_msgs::msg::TransformStamped tf =
-				tf_buffer_->lookupTransform("ned_world", src, tf2::TimePointZero);
+				tf_buffer_->lookupTransform(anchor, src, tf2::TimePointZero);
 			geometry_msgs::msg::PoseStamped wp_ned;
 			tf2::doTransform(wp, wp_ned, tf);  // rotates BOTH position and orientation
 			msg.position[0] = (float)wp_ned.pose.position.x;
@@ -154,7 +174,7 @@ void M4ControllerNode::publish_trajectory_setpoint(const geometry_msgs::msg::Pos
 			return;
 		}
 	} else {
-		// frame_id empty or already ned_world — use coordinates directly
+		// frame_id empty or already the anchor frame — use coordinates directly
 		msg.position[0] = (float)wp.pose.position.x;
 		msg.position[1] = (float)wp.pose.position.y;
 		msg.position[2] = (float)wp.pose.position.z;
@@ -177,11 +197,12 @@ void M4ControllerNode::publish_landing_detect_setpoint()
 
 	const geometry_msgs::msg::PoseStamped& wp = landing_setpoint_ps_;
 	const std::string& src = wp.header.frame_id;
+	const std::string anchor = ned_anchor_frame();
 	geometry_msgs::msg::Quaternion ori_nedworld;
-	if (!src.empty() && src != "ned_world") {
+	if (!src.empty() && src != anchor) {
 		try {
 			geometry_msgs::msg::TransformStamped tf =
-				tf_buffer_->lookupTransform("ned_world", src, tf2::TimePointZero);
+				tf_buffer_->lookupTransform(anchor, src, tf2::TimePointZero);
 			geometry_msgs::msg::PoseStamped wp_ned;
 			tf2::doTransform(wp, wp_ned, tf);
 			msg.position[0] = (float)wp_ned.pose.position.x;
@@ -215,13 +236,14 @@ void M4ControllerNode::publish_trajectory_setpoint_pva(const custom_msgs::msg::M
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 
 	const std::string& src = sp.header.frame_id;
+	const std::string anchor = ned_anchor_frame();
 	geometry_msgs::msg::Quaternion ori_nedworld;
 	geometry_msgs::msg::Vector3 vel_ned = sp.velocity;      // default: already in target frame
 	geometry_msgs::msg::Vector3 acc_ned = sp.acceleration;
-	if (!src.empty() && src != "ned_world") {
+	if (!src.empty() && src != anchor) {
 		try {
 			geometry_msgs::msg::TransformStamped tf =
-				tf_buffer_->lookupTransform("ned_world", src, tf2::TimePointZero);
+				tf_buffer_->lookupTransform(anchor, src, tf2::TimePointZero);
 			// position + orientation: rotate both via a PoseStamped (same as waypoint)
 			geometry_msgs::msg::PoseStamped wp, wp_ned;
 			wp.header           = sp.header;
@@ -426,6 +448,66 @@ px4_msgs::msg::VehicleOdometry M4ControllerNode::convert_odom_flu_to_ned(
 	px4_odom.velocity_frame = px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED;
 
 	// Angular velocity: base_link FLU → ned_base_link FRD
+	geometry_msgs::msg::Vector3Stamped ang_in, ang_out;
+	ang_in.header.frame_id = ros_odom.child_frame_id;  // "base_link"
+	ang_in.header.stamp    = ros_odom.header.stamp;
+	ang_in.vector          = ros_odom.twist.twist.angular;
+	tf_buffer_->transform(ang_in, ang_out, "ned_base_link");
+
+	px4_odom.angular_velocity[0] = (float)ang_out.vector.x;
+	px4_odom.angular_velocity[1] = (float)ang_out.vector.y;
+	px4_odom.angular_velocity[2] = (float)ang_out.vector.z;
+
+	for (int i = 0; i < 3; i++) {
+		px4_odom.position_variance[i]    = NaNf;
+		px4_odom.orientation_variance[i] = NaNf;
+		px4_odom.velocity_variance[i]    = NaNf;
+	}
+	px4_odom.quality = 1;
+	return px4_odom;
+}
+
+// Relocalization variant: identical to convert_odom_flu_to_ned() except the
+// global NED anchor is ned_map instead of ned_world.
+// TF chain: ned_map ← map ← camera_init ← body ← base_link ← ned_base_link
+//   (map ← camera_init is scan_lock's dynamic lock; the position therefore
+//    reflects the localized global pose and jumps on relock — PX4's EV fusion
+//    absorbs it as a position reset. The velocity uses the SMOOTH msg twist
+//    (/localization/odom, world frame) so the feed-forward stays clean.)
+// Requires the static TF map→ned_map (180° about X, added in m4_relocalization.launch.py).
+px4_msgs::msg::VehicleOdometry M4ControllerNode::convert_odom_flu_to_ned_relocal(
+	const nav_msgs::msg::Odometry& ros_odom)
+{
+	px4_msgs::msg::VehicleOdometry px4_odom{};
+	px4_odom.timestamp        = this->get_clock()->now().nanoseconds() / 1000;
+	px4_odom.timestamp_sample = px4_odom.timestamp;
+
+	geometry_msgs::msg::TransformStamped tf_pose =
+		tf_buffer_->lookupTransform("ned_map", "ned_base_link", tf2::TimePointZero);
+
+	px4_odom.position[0] = (float)tf_pose.transform.translation.x;
+	px4_odom.position[1] = (float)tf_pose.transform.translation.y;
+	px4_odom.position[2] = (float)tf_pose.transform.translation.z;
+	px4_odom.pose_frame  = px4_msgs::msg::VehicleOdometry::POSE_FRAME_NED;
+
+	const auto& q = tf_pose.transform.rotation;
+	px4_odom.q[0] = (float)q.w;
+	px4_odom.q[1] = (float)q.x;
+	px4_odom.q[2] = (float)q.y;
+	px4_odom.q[3] = (float)q.z;
+
+	// Linear velocity: world FLU → ned_map NED (smooth /localization/odom twist)
+	geometry_msgs::msg::Vector3Stamped vel_in, vel_out;
+	vel_in.header = ros_odom.header;   // frame_id = "world"
+	vel_in.vector = ros_odom.twist.twist.linear;
+	tf_buffer_->transform(vel_in, vel_out, "ned_map");
+
+	px4_odom.velocity[0]    = (float)vel_out.vector.x;
+	px4_odom.velocity[1]    = (float)vel_out.vector.y;
+	px4_odom.velocity[2]    = (float)vel_out.vector.z;
+	px4_odom.velocity_frame = px4_msgs::msg::VehicleOdometry::VELOCITY_FRAME_NED;
+
+	// Angular velocity: base_link FLU → ned_base_link FRD (body frame, anchor-agnostic)
 	geometry_msgs::msg::Vector3Stamped ang_in, ang_out;
 	ang_in.header.frame_id = ros_odom.child_frame_id;  // "base_link"
 	ang_in.header.stamp    = ros_odom.header.stamp;

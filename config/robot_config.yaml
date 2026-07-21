@@ -156,6 +156,13 @@ auto_mode:
     #   "pva"  -> /auto/trajectory_waypoint (M4TrajectorySetpoint, position+velocity+acceleration + yaw)
     setpoint_source: "pva"
     # setpoint_source: "pose"
+    # localization_mode: NED anchor selection for odom->PX4 and setpoint->PX4.
+    #   "localization"   -> ned_world anchor (pure fastlio; use for sim / non-relocalized).
+    #   "relocalization" -> ned_map anchor (scan_lock global map; needs the map->ned_map
+    #                        static TF from m4_relocalization.launch.py, and the bimodel
+    #                        follower in map frame). MUST stay consistent with the bimodel
+    #                        controller's follower.localization_mode.
+    localization_mode: "localization"
     landing_descent_mps: 0.3     # controlled descent rate during LANDING (m/s, pending calibration)
     landing_z_stop_thr: 0.05     # odom Z velocity threshold to detect touchdown (m/s, fallback)
     landing_z_stop_dur: 1.0      # seconds Z velocity must stay below threshold to confirm touchdown

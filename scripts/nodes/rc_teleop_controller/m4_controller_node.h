@@ -108,6 +108,12 @@ private:
 	//   "pva"  -> consume M4TrajectorySetpoint on /auto/trajectory_waypoint (PVA + yaw)
 	std::string setpoint_source_{"pose"};
 	bool        pva_input_{false};        // cached (setpoint_source_ == "pva")
+	// localization_mode: "localization" -> ned_world anchor (pure fastlio, sim);
+	//                    "relocalization" -> ned_map anchor (scan_lock global map).
+	// Selects the NED anchor for BOTH the odom-to-PX4 conversion and the
+	// setpoint-to-PX4 conversion so PX4 sees a single consistent frame.
+	std::string localization_mode_{"localization"};
+	bool        relocal_mode_{false};     // cached (localization_mode_ == "relocalization")
 	double      landing_descent_mps_{0.3};  // controlled descent rate during LANDING (m/s)
 	double      landing_z_stop_thr_{0.05};  // odom Z velocity threshold to detect touchdown
 	double      landing_z_stop_dur_{1.0};   // seconds Z must stay below threshold to confirm touchdown
@@ -234,6 +240,10 @@ private:
 	void publish_trajectory_setpoint(const geometry_msgs::msg::PoseStamped& wp);
 	void publish_trajectory_setpoint_pva(const custom_msgs::msg::M4TrajectorySetpoint& sp);
 	float setpoint_yaw_ned(const geometry_msgs::msg::Quaternion& ori_nedworld) const;
+	// NED anchor frame for setpoint/odom conversion: "ned_map" in relocalization
+	// mode (scan_lock global), "ned_world" in localization mode (pure fastlio).
+	// All conversions go through TF lookupTransform against this frame.
+	const char* ned_anchor_frame() const;
 	void publish_descent_setpoint();
 	void offboard_heartbeat_callback();
 	static int32_t config_to_int(M4Configurations cfg);
@@ -241,6 +251,10 @@ private:
 	void publish_mode_status();
 	geometry_msgs::msg::PoseStamped odom_to_posestamped() const;
 	px4_msgs::msg::VehicleOdometry convert_odom_flu_to_ned(const nav_msgs::msg::Odometry& ros_odom);
+	// relocalization variant: ned_map anchor (map<-camera_init via scan_lock).
+	// Position/orientation from TF ned_map<-ned_base_link (localized, jumps on
+	// relock -> PX4 EV reset absorbs it); velocity from the (smooth) msg twist.
+	px4_msgs::msg::VehicleOdometry convert_odom_flu_to_ned_relocal(const nav_msgs::msg::Odometry& ros_odom);
 	void process_mode_cmd(const custom_msgs::msg::M4ModeCmd& cmd);
 	void execute_auto_ground();
 	void execute_auto_aerial();
